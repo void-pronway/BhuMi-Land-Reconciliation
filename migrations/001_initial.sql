@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS schema_migrations (version integer PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS parcels (id text PRIMARY KEY, metadata jsonb NOT NULL);
+CREATE TABLE IF NOT EXISTS parties (parcel_id text REFERENCES parcels(id), id text, name text NOT NULL, PRIMARY KEY(parcel_id,id));
+CREATE TABLE IF NOT EXISTS documents (parcel_id text REFERENCES parcels(id), id text, data jsonb NOT NULL, PRIMARY KEY(parcel_id,id));
+CREATE TABLE IF NOT EXISTS baselines (parcel_id text REFERENCES parcels(id), party text, share text NOT NULL, PRIMARY KEY(parcel_id,party));
+CREATE TABLE IF NOT EXISTS events (parcel_id text REFERENCES parcels(id), id text, data jsonb NOT NULL, PRIMARY KEY(parcel_id,id));
+CREATE TABLE IF NOT EXISTS allocations (parcel_id text, event_id text, ordinal integer, data jsonb NOT NULL, PRIMARY KEY(parcel_id,event_id,ordinal), FOREIGN KEY(parcel_id,event_id) REFERENCES events(parcel_id,id));
+CREATE TABLE IF NOT EXISTS snapshots (parcel_id text REFERENCES parcels(id), id text, data jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(parcel_id,id));
+CREATE TABLE IF NOT EXISTS holdings (parcel_id text, snapshot_id text, party text, share text NOT NULL, PRIMARY KEY(parcel_id,snapshot_id,party), FOREIGN KEY(parcel_id,snapshot_id) REFERENCES snapshots(parcel_id,id));
+CREATE TABLE IF NOT EXISTS runs (id text PRIMARY KEY, parcel_id text REFERENCES parcels(id), result jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS discrepancies (id text PRIMARY KEY, run_id text REFERENCES runs(id), finding jsonb NOT NULL);
+CREATE TABLE IF NOT EXISTS review_cases (id text PRIMARY KEY, run_id text UNIQUE REFERENCES runs(id), status text NOT NULL, note text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS audit_log (id text PRIMARY KEY, actor text NOT NULL, action text NOT NULL, entity_id text NOT NULL, previous_value jsonb, new_value jsonb NOT NULL, reason text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+INSERT INTO schema_migrations(version) VALUES(1) ON CONFLICT DO NOTHING;
