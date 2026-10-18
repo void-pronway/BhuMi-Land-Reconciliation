@@ -310,6 +310,38 @@ npm run start
 
 Open the same browser origin. Rebuild after source changes when using production mode. This local persistence adapter is not suitable for ephemeral/serverless deployment; connecting a hosted database requires an implemented adapter and migration process, not just a Supabase URL.
 
+## Deploy manually on Render
+
+Create a **Node Web Service** connected to this repository's `main` branch. Use a paid service with a persistent disk and one instance for the embedded database.
+
+| Setting                    | Value                                   |
+| -------------------------- | --------------------------------------- |
+| Root directory             | Leave empty                             |
+| Build command              | `npm ci --include=dev && npm run build` |
+| Start command              | `npm run start -- --port $PORT`         |
+| Auto-deploy                | Off for manual deployments              |
+| Persistent disk mount path | `/var/data`                             |
+| Health check path          | `/api/workspace`                        |
+
+**Keep `--include=dev` in the build command.** When `NODE_ENV=production`, a plain `npm ci` omits development dependencies. Next.js still needs Tailwind's PostCSS plugin and TypeScript during the build. Omitting them causes errors such as `Cannot find module '@tailwindcss/postcss'`. Including build tools does not change the application to development mode: `next build` and `next start` still produce and serve a production application.
+
+Configure these variables in Render's Environment settings:
+
+| Variable            | Value                                                              |
+| ------------------- | ------------------------------------------------------------------ |
+| `NODE_VERSION`      | `24.19.0`                                                          |
+| `NODE_ENV`          | `production`                                                       |
+| `DATABASE_PATH`     | `/var/data/bhumi`                                                  |
+| `REVIEWER_PASSWORD` | Your strong, private reviewer password                             |
+| `SESSION_SECRET`    | A random secret of at least 32 characters                          |
+| `APP_ORIGIN`        | The exact assigned HTTPS service address, without a trailing slash |
+
+Do not upload `.env.local`. The persistent disk is available at runtime, not during the build, so do not add migration or seed commands to Render's build command. The first application request initializes the database and missing synthetic records automatically.
+
+For an existing failed deployment, change **Settings → Build Command** to the value above, save it, then choose **Manual Deploy → Deploy latest commit**. Keep `NODE_ENV=production`. A “No build cache found” warning does not cause the missing-module error.
+
+After deployment, open the service, sign in, run `DEMO-P4-001` and create a review case. Restart the service and confirm that both the run and case remain. This validates the persistent-disk configuration. Local build verification does not establish that a Render deployment has succeeded.
+
 ## Troubleshooting
 
 | Symptom                                                   | What to check or do                                                                                                                                                                                 |
