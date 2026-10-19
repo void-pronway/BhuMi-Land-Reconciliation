@@ -1,5 +1,11 @@
 <img src="public/brand/bhumi-logo.png" alt="BhuMi — Land Ownership Reconciliation" width="280" />
 
+## Recorded demonstration
+
+[Download the edited 60-second site demo (MP4)](docs/videos/BhuMi_Demo_60s.mp4) · [Video notes and captions](docs/videos/README.md)
+
+An actual recording of the Bangla site, edited with slower playback, English explanations and the BhuMi logo. It shows the guided ownership example, discrepancy and correction results, then the judge workspace. Silent video; fictional records only.
+
 ## Judge demo login
 
 Visit [the live sign-in page](https://bhumi.diu.my.id/?view=login) and select **Enter judge demo** (বাংলা: **বিচারকের ডেমোতে প্রবেশ করুন**), or use:

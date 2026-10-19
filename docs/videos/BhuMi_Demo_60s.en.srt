@@ -1,0 +1,27 @@
+1
+00:00:00,000 --> 00:00:05,000
+BhuMi — Land Ownership Reconciliation. Actual site recording; fictional demonstration records.
+
+2
+00:00:05,000 --> 00:00:12,600
+One deed. A clearer ownership story.. The Bangla interface introduces the reconciliation workflow.
+
+3
+00:00:12,600 --> 00:00:20,200
+Follow the ownership history. Start with the recorded shares, then inspect the mutation.
+
+4
+00:00:20,200 --> 00:00:27,800
+Find differences hidden by a correct total. Compare the expected and recorded shares for each owner.
+
+5
+00:00:27,800 --> 00:00:39,200
+Check a corrected sample. The guided demo recalculates and shows a matching result.
+
+6
+00:00:39,200 --> 00:00:55,000
+Explore the judge workspace. Open the fictional parcel scenarios for further review.
+
+7
+00:00:55,000 --> 00:01:00,000
+Try bhumi.diu.my.id. Choose Enter judge demo. A match does not establish legal title.
