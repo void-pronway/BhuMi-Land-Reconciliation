@@ -1,3 +1,4 @@
+import { DEMO_ACCOUNT, demoAccessEnabled } from "../demo-account";
 import { connection, type Database } from "./connection";
 import { hashPassword } from "../server/password";
 import { ApiError } from "../server/http";
@@ -95,9 +96,26 @@ export async function database() {
               }
             });
         }
+        if (demoAccessEnabled()) {
+          const exists = await gate.execute(
+            sql`select id from app_users where email=${DEMO_ACCOUNT.email}`,
+          );
+          if (!exists.rows.length) {
+            const hash = await hashPassword(DEMO_ACCOUNT.password);
+            await gate.execute(
+              sql`insert into app_users(id,email,display_name,password_hash,role) values(${DEMO_ACCOUNT.id},${DEMO_ACCOUNT.email},'Competition judge demo',${hash},'REVIEWER')`,
+            );
+          }
+          for (const parcel of scenarios()) {
+            await gate.execute(
+              sql`insert into parcel_access(user_id,parcel_id) values(${DEMO_ACCOUNT.id},${parcel.id}) on conflict do nothing`,
+            );
+          }
+        }
         if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
           const email = process.env.ADMIN_EMAIL.trim().toLowerCase();
           if (
+            email === DEMO_ACCOUNT.email ||
             !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
             process.env.ADMIN_PASSWORD.length < 12 ||
             process.env.ADMIN_PASSWORD.length > 128

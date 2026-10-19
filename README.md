@@ -1,5 +1,16 @@
 ![BhuMi — Records. Reconciled.](public/wordmark.svg)
 
+## Judge demo login
+
+Visit [the live sign-in page](https://bhumi.diu.my.id/?view=login) and select **Enter judge demo** (বাংলা: **বিচারকের ডেমোতে প্রবেশ করুন**), or use:
+
+- **Email:** `judge@bhumi.demo`
+- **Password:** `BhuMi-Judge-Demo-2026!`
+
+These credentials are intentionally public, available on the sign-in page after deployment. The shared reviewer can run checks and save reviews for the 11 fictional demonstration parcels. Changes and notes are visible to other visitors: **do not enter personal or real land-record information**. The account cannot manage users or change its password. Administrator and individual account credentials remain private.
+
+Startup creates the demo account automatically when demo seeding is enabled. Set `PUBLIC_DEMO_ACCESS=false` (or `SEED_DEMO=false`) and restart to disable public demo login and its existing sessions. Disabling it does not erase records. Do this before using a private dataset; do not repurpose the seeded demo parcel IDs for real records.
+
 # BhuMi · ভূমি
 
 **Land Ownership Reconciliation · LandTech 2026 · P4 — Smart e-Mutation & Registry**

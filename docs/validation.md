@@ -32,3 +32,7 @@ Screenshots in `docs/screenshots` are captured from the running rebuilt applicat
 To reproduce, follow the README verification section. Use a **fresh disposable database per suite** for `TEST_DATABASE_URL`; browser journeys intentionally modify snapshots and accounts. Never point these tests at a deployed database.
 
 Not measured: national-scale accuracy/performance, legal correctness, production penetration testing, multiple application instances, government integration, hosted provider connectivity, real-data migration, production backup restoration or GitHub Actions execution. Local passes do not establish a successful Render deployment or remote CI run. Bangla interface copy still needs domain-expert review before institutional use.
+
+## Public judge access update
+
+The public-account update passed all 31 unit tests, ESLint, production build and all nine embedded-database browser journeys. The added journey exercises the visible Bangla one-click judge login, fixture grants, successful reconciliation, forbidden account administration and forbidden public-password changes. The same added journey also passed against a fresh native PostgreSQL database. The eight earlier native-adapter journeys were verified for the preceding rebuild, as recorded above.

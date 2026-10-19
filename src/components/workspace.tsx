@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { DEMO_ACCOUNT } from "@/lib/demo-account";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -468,6 +469,7 @@ function Reviewer({ onUser }: { onUser: (user: User | null) => void }) {
   const { t, n, lang } = usePreferences();
   const [user, setUser] = useState<User | null>(null),
     [checking, setChecking] = useState(true),
+    [demoAvailable, setDemoAvailable] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [data, setData] = useState<Data | null>(null),
@@ -480,10 +482,11 @@ function Reviewer({ onUser }: { onUser: (user: User | null) => void }) {
     [saved, setSaved] = useState(false);
   useEffect(() => {
     let live = true;
-    api<{ user: User | null }>("/api/session")
+    api<{ user: User | null; demoAvailable: boolean }>("/api/session")
       .then((d) => {
         if (live) {
           setUser(d.user);
+          setDemoAvailable(d.demoAvailable);
           onUser(d.user);
           setChecking(false);
         }
@@ -573,7 +576,9 @@ function Reviewer({ onUser }: { onUser: (user: User | null) => void }) {
               if (user) load().catch((e) => setError(e.message));
               else {
                 setChecking(true);
-                api<{ user: User | null }>("/api/session")
+                api<{ user: User | null; demoAvailable: boolean }>(
+                  "/api/session",
+                )
                   .then((d) => {
                     setUser(d.user);
                     onUser(d.user);
@@ -622,6 +627,33 @@ function Reviewer({ onUser }: { onUser: (user: User | null) => void }) {
             <LockKeyhole size={26} />
           </div>
           <h2>{t("signIn")}</h2>
+          {demoAvailable && (
+            <div className="notice">
+              <strong>{t("judgeAccess")}</strong>
+              <p>{t("judgeNotice")}</p>
+              <p>
+                {t("email")}: <code>{DEMO_ACCOUNT.email}</code>
+                <br />
+                {t("password")}: <code>{DEMO_ACCOUNT.password}</code>
+              </p>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={busy}
+                onClick={(event) => {
+                  const form = event.currentTarget.form!;
+                  (form.elements.namedItem("email") as HTMLInputElement).value =
+                    DEMO_ACCOUNT.email;
+                  (
+                    form.elements.namedItem("password") as HTMLInputElement
+                  ).value = DEMO_ACCOUNT.password;
+                  form.requestSubmit();
+                }}
+              >
+                {t("judgeEnter")}
+              </button>
+            </div>
+          )}
           <label>
             {t("email")}
             <input

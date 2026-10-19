@@ -1,3 +1,4 @@
+import { DEMO_ACCOUNT, demoAccessEnabled } from "./demo-account";
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { sql } from "drizzle-orm";
@@ -20,7 +21,9 @@ export async function currentUser(): Promise<User | null> {
   const rows = await db.execute(
     sql`select u.id,u.email,u.display_name,u.role from sessions s join app_users u on u.id=s.user_id where s.token_hash=${digest(token)} and s.expires_at>now() and not u.disabled`,
   );
-  return (rows.rows[0] as unknown as User) ?? null;
+  const user = (rows.rows[0] as unknown as User) ?? null;
+  if (user?.id === DEMO_ACCOUNT.id && !demoAccessEnabled()) return null;
+  return user;
 }
 export async function requireUser() {
   const user = await currentUser();
@@ -39,6 +42,8 @@ export async function limit(key: string, max: number, seconds: number) {
   );
 }
 export async function login(email: string, password: string) {
+  if (email === DEMO_ACCOUNT.email && !demoAccessEnabled())
+    throw new ApiError("INVALID_CREDENTIALS", 401);
   await limit("login-global", 60, 60);
   await limit(`login:${email}`, 8, 900);
   const db = await database();
@@ -57,7 +62,7 @@ export async function login(email: string, password: string) {
       sql`insert into sessions(token_hash,user_id,expires_at) values(${digest(token)},${String(found.id)},now()+interval '8 hours')`,
     );
     await tx.execute(
-      sql`delete from sessions where token_hash in (select token_hash from sessions where user_id=${String(found.id)} order by created_at desc offset 5)`,
+      sql`delete from sessions where token_hash in (select token_hash from sessions where user_id=${String(found.id)} order by created_at desc offset ${String(found.id) === DEMO_ACCOUNT.id ? 100 : 5})`,
     );
   });
   return token;
@@ -78,7 +83,8 @@ export async function createAccount(
   password: string,
   parcelIds: string[],
 ) {
-  if (admin.role !== "ADMIN") throw new ApiError("FORBIDDEN", 403);
+  if (admin.role !== "ADMIN" || email === DEMO_ACCOUNT.email)
+    throw new ApiError("FORBIDDEN", 403);
   const db = await database(),
     id = crypto.randomUUID(),
     hash = await hashPassword(password);
@@ -126,6 +132,7 @@ export async function changePassword(
   current: string,
   next: string,
 ) {
+  if (user.id === DEMO_ACCOUNT.id) throw new ApiError("DEMO_PASSWORD", 403);
   await limit(`password:${user.id}`, 5, 900);
   const db = await database();
   await db.transaction(async (tx) => {

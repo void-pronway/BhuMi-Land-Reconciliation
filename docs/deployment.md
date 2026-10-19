@@ -80,3 +80,9 @@ For a local upgrade with the same embedded directory, migration 002 adds account
 - A 429 response: wait for the rate-limit window. Account login windows are 15 minutes; global login and normal request windows are one minute.
 
 The PostgreSQL adapter is tested against PostgreSQL 17 locally. TLS configuration is unit-tested. No connection to your Neon/Supabase project or successful Render deployment is claimed until those are actually configured and checked.
+
+## Public judge account
+
+With `SEED_DEMO=true` and `PUBLIC_DEMO_ACCESS` unset or `true`, startup creates the public reviewer `judge@bhumi.demo` / `BhuMi-Judge-Demo-2026!`. Both credentials and a one-click login appear on the live sign-in page. Redeploy the latest commit to enable this feature; no manual database query is required.
+
+This account can change shared fictional reviews and snapshots, cannot manage accounts, and cannot change its password. Keep administrator credentials private. Set `PUBLIC_DEMO_ACCESS=false` and restart to reject public judge logins and existing demo sessions before private use. Never put real records into demo parcel IDs. Normal throttling still applies; the shared demo account permits up to 100 active sessions (individual accounts remain limited to five).

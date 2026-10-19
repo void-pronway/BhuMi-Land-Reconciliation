@@ -38,3 +38,9 @@ Runtime API errors expose machine-readable codes, not SQL or credentials. Logs e
 ## Before any real sensitive data
 
 No real land records are required for this prototype. A validated fraction or source reference does not establish document authenticity, legal title or lawful entitlement. There is no malware-scanned document upload pipeline. A real deployment requires an approved data-handling basis, reviewed retention/redaction policies, institutional access controls, backup and recovery testing, domain/legal review, and an independent security assessment. Free hosting and passing automated tests do not establish those requirements.
+
+## Deliberately public competition access
+
+The seeded judge account has published credentials and reviewer access only to the 11 named fictional parcels. It is not an identity assertion: any visitor can use it, and its audit entries identify the shared demo account, not an individual judge. Its notes and changes are shared. Account administration and password changes are forbidden for this account. Private accounts and admin credentials are never published.
+
+Disable with `PUBLIC_DEMO_ACCESS=false` or `SEED_DEMO=false` and restart; both fresh logins and existing demo sessions are rejected. Do not store private information in demo records, notes or fixture IDs. Individual account authentication, grants and throttling continue to apply.

@@ -481,3 +481,47 @@ test("password changes revoke existing sessions and reject the old password", as
   expect((await account.get("/api/workspace")).status()).toBe(200);
   await account.dispose();
 });
+
+test("public judge credentials sign in and cannot manage accounts or change password", async ({
+  page,
+}) => {
+  await page.goto("/?view=login");
+  await expect(
+    page.getByText("judge@bhumi.demo", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "বিচারকের ডেমোতে প্রবেশ করুন" })
+    .click();
+  await expect(
+    page.getByText("judge@bhumi.demo", { exact: true }),
+  ).not.toBeVisible();
+  const request = page.request;
+  const session = await (await request.get("/api/session")).json();
+  expect(session.user.email).toBe("judge@bhumi.demo");
+  expect(session.user.role).toBe("REVIEWER");
+  expect((await request.get("/api/accounts")).status()).toBe(403);
+  expect(
+    (
+      await request.patch("/api/session", {
+        headers,
+        data: {
+          currentPassword: "BhuMi-Judge-Demo-2026!",
+          newPassword: "Changed-Demo-Password!",
+        },
+      })
+    ).status(),
+  ).toBe(403);
+  const workspace = await (await request.get("/api/workspace")).json();
+  expect(workspace.total).toBe(11);
+  expect(
+    (
+      await request.post("/api/workspace", {
+        headers,
+        data: {
+          action: "run",
+          parcelId: "DEMO-P4-011",
+        },
+      })
+    ).status(),
+  ).toBe(200);
+});

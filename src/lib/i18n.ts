@@ -99,6 +99,12 @@ export const copy = {
     CONFLICT: "The ownership allocation does not reconcile.",
     INSUFFICIENT_EVIDENCE: "More evidence is needed.",
     REVIEW_REQUIRED: "A reviewer must interpret these records.",
+    judgeAccess: "Judges: public demo access",
+    judgeNotice:
+      "Shared fictional records. You can run checks and save reviews. Changes are visible to other visitors; do not enter personal information.",
+    judgeEnter: "Enter judge demo",
+    DEMO_PASSWORD:
+      "This public demo password cannot be changed. Use a private account for your own work.",
     loginTitle: "Your review workspace",
     loginText:
       "Use your individual account. Access is limited to the parcels assigned to you.",
@@ -359,6 +365,12 @@ export const copy = {
     CONFLICT: "মালিকানার অংশের হিসাবে অমিল আছে।",
     INSUFFICIENT_EVIDENCE: "আরও প্রমাণ প্রয়োজন।",
     REVIEW_REQUIRED: "রেকর্ডগুলো পর্যালোচকের ব্যাখ্যা প্রয়োজন।",
+    judgeAccess: "বিচারকদের জন্য উন্মুক্ত ডেমো",
+    judgeNotice:
+      "এখানে সবাই একই কাল্পনিক রেকর্ড ব্যবহার করেন। যাচাই ও পর্যালোচনা সংরক্ষণ করতে পারবেন। পরিবর্তন অন্যরাও দেখবেন; ব্যক্তিগত তথ্য লিখবেন না।",
+    judgeEnter: "বিচারকের ডেমোতে প্রবেশ করুন",
+    DEMO_PASSWORD:
+      "উন্মুক্ত ডেমোর পাসওয়ার্ড পরিবর্তন করা যায় না। নিজের কাজের জন্য ব্যক্তিগত অ্যাকাউন্ট ব্যবহার করুন।",
     loginTitle: "আপনার পর্যালোচনার কর্মক্ষেত্র",
     loginText:
       "নিজের অ্যাকাউন্ট দিয়ে প্রবেশ করুন। শুধু আপনাকে বরাদ্দ করা জমির রেকর্ড দেখতে পারবেন।",

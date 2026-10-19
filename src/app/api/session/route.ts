@@ -1,3 +1,4 @@
+import { demoAccessEnabled } from "@/lib/demo-account";
 import { z } from "zod";
 import {
   login,
@@ -19,7 +20,10 @@ const credentials = z
   .strict();
 export async function GET() {
   try {
-    return json({ user: await currentUser() });
+    return json({
+      user: await currentUser(),
+      demoAvailable: demoAccessEnabled(),
+    });
   } catch (e) {
     return failure(e);
   }
