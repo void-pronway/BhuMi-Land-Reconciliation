@@ -1,5 +1,15 @@
 # BhuMi pitch deck
 
+## Updated full-stack product pitch
+
+- [Editable updated PowerPoint — 10 slides](BhuMi_Updated_Pitch_Deck.pptx)
+- [Five-minute speaker notes](Updated_Speaker_Notes.md), also embedded in the PowerPoint.
+- Regenerate with `python3 docs/presentation/generate_updated_deck.py` (requires `python-pptx`).
+
+This edition covers the rebuilt Bangla/English interface, light/dark themes, guided demo, individual access, strict backend validation, PostgreSQL hosting, measured test coverage and public judge access. The ownership table, diagrams and text are editable PowerPoint objects; the supplied logo remains a raster image. Names and DIU IDs are preserved from the user's uploaded deck. Confirm team roles and rehearse the live demo before submission. No mentor details were supplied, so none are invented. This edition has not been submitted and no updated PDF export is included.
+
+## Earlier nine-slide edition
+
 **Version note:** These presentation files predate the bilingual redesign and individual accounts. Review screenshots, authentication, database details and test counts against the current README and validation report before presenting; the deck has not been regenerated for this release.
 
 - [Nine-slide PDF](BhuMi_Pitch_Deck.pdf): submission/presentation copy.
