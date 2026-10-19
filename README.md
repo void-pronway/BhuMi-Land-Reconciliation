@@ -1,377 +1,247 @@
 ![BhuMi — Records. Reconciled.](public/wordmark.svg)
 
-# BhuMi · Land Ownership Reconciliation Engine
+# BhuMi · ভূমি
 
-**LandTech Innovation Hackathon 2026 · P4 — Smart e-Mutation & Registry**
+**Land Ownership Reconciliation · LandTech 2026 · P4 — Smart e-Mutation & Registry**
 
-A registered deed and the mutation that follows can tell different ownership stories. BhuMi reconstructs documented ownership interests using exact fractions, compares each party with the supplied mutation, and gives a simulated reviewer source-linked findings. **Correct total area does not necessarily mean correct ownership allocation.**
+A land record can add up correctly and still give someone the wrong share. BhuMi independently replays documented transfers, compares each owner's interest with the mutation record, and explains the difference for human review.
 
-This is an independent, synthetic-data prototype, not a government service or a legal-title verification system. Undivided share equivalents do not establish physical boundaries.
+The rebuilt prototype includes a **Bangla/English guided demonstration**, **light/dark themes**, a private reviewer workspace, individual accounts and persistent PostgreSQL support for **one free Render web service**. All included records are fictional. BhuMi does not determine legal title, approve mutations or establish physical boundaries.
 
-**First visit?** Start with the [beginner guide](#start-here), then follow the complete [hands-on walkthrough](#guided-walkthrough-detect-review-and-correct-a-discrepancy).
-
-## What works
-
-- BigInt rational arithmetic, deterministic event replay and exact owner-by-owner comparison.
-- Sales, gifts, explicit succession allocations, same-parcel partitions and documented reallocating corrections. No automatic inheritance-law decisions.
-- Nine discrepancy categories, separate evidence completeness, four reconciliation outcomes.
-- Eleven seeded scenarios, including the 120-decimal signature case and concept note’s 100-decimal example.
-- Searchable parcel explorer, baseline distribution, expandable event history and source evidence.
-- Persistent reconciliation runs, revised mutation snapshots, review cases and audit history.
-- Password-protected simulated reviewer actions; read-only public demonstration.
-- Printable source-linked reports; responsive desktop/mobile interface.
-
-Planned, **not implemented**: hosted PostgreSQL adapter, institution-managed identities, bilingual UX, document/event ingestion editor, cross-parcel partition and legal-rule templates, official integrations. OCR, blockchain and AI ownership decisions are intentionally outside the prototype.
-
-## Architecture
-
-```text
-Next.js / React workspace
-   → Zod-validated, authorized route handlers
-   → pure TypeScript reconciliation engine
-   → Drizzle parameterized SQL + embedded PostgreSQL (PGlite)
-   → historical runs, review cases, audit entries and printable reports
-```
-
-The baseline, ownership events and observed mutation snapshots remain separate. A mutation never becomes an ownership event. Runs capture their complete input and result; a revised snapshot creates a new calculation without changing earlier findings. Review decisions never rewrite ownership inputs.
-
-See [architecture and rules](docs/architecture.md) and [demo guide](docs/demo.md).
+![English dark-theme homepage](docs/screenshots/home-en-dark.png)
 
 ## Start here
 
-**New to the prototype?** Follow [first-time setup](#first-time-setup), then the [guided walkthrough](#guided-walkthrough-detect-review-and-correct-a-discrepancy). You do not need to understand the source code to use the demo.
+| Your goal                            | Start with                                                    |
+| ------------------------------------ | ------------------------------------------------------------- |
+| Understand BhuMi without signing in  | [Public guided demonstration](#public-guided-demonstration)   |
+| Run it on your computer              | [First-time local setup](#first-time-local-setup)             |
+| Deploy on free Render                | [Free Render deployment guide](docs/deployment.md)            |
+| Save findings and review corrections | [Reviewer walkthrough](#reviewer-walkthrough)                 |
+| Create individual reviewer accounts  | [Team access and passwords](#team-access-and-passwords)       |
+| Understand security and limits       | [Security architecture](docs/security.md)                     |
+| Prepare the pitch                    | [Presentation and speaker notes](docs/presentation/README.md) |
 
-**Already running in a prepared environment?** Open its existing application session and go to [reviewer sign-in](#sign-in-as-a-simulated-reviewer). Do not start a second server against the same database.
+**Upgrading from the original prototype?** The shared `REVIEWER_PASSWORD` and `SESSION_SECRET` login have been replaced. Configure `ADMIN_EMAIL`, `ADMIN_PASSWORD` and, on Render, `DATABASE_URL`. Existing embedded records are preserved when using the same local directory, but are not automatically moved to a hosted database. Follow the [upgrade instructions](docs/deployment.md#upgrading-an-existing-render-service) before redeploying.
 
-Useful sections:
+## What changed
 
-- [What the terms mean](#what-the-terms-mean)
-- [Find your way around](#find-your-way-around)
-- [Understand the results](#understand-the-results)
-- [Try the other scenarios](#try-the-other-scenarios)
-- [Stop, restart and repeat the demo](#stop-restart-and-repeat-the-demo)
-- [Troubleshooting](#troubleshooting)
-- [Developer checks](#developer-checks)
+- An original public homepage that explains the problem before exposing technical controls.
+- Five guided steps: starting owners → sale → mutation → difference → corrected example.
+- Bangla and English navigation, forms, errors, explanations and report labels; a remembered language preference.
+- Locally bundled Bengali/Latin fonts, localized numbers, and Bangla-digit input in the snapshot form.
+- Light/dark themes, system preference by default, and a remembered manual choice.
+- Individual accounts with salted password hashes, revocable server-side sessions and self-service password changes.
+- Administrators assign specific parcels to each reviewer. Every private read/write checks authorization on the server.
+- Protected reports and private, non-cacheable API responses. The public demo uses separate static fictional fixtures, never saved workspace data.
+- Paginated parcel lists, run history, review queue, audit log and account lists.
+- An external PostgreSQL adapter with a small connection pool, verified remote TLS and query timeouts. Local PGlite remains available for development.
+- Validation of fractions, dates, identifiers, request sizes and review transitions; database constraints and transaction-based concurrency checks.
+- Cold-start/error recovery that does not misreport account configuration when loading fails.
+
+Planned, not implemented: public registration, email/password recovery, MFA, document uploads, new-parcel/event ingestion forms, automatic migration of old embedded data into hosted PostgreSQL, cross-parcel partition law, official government integration and legally validated inheritance rules. Source text and reviewer notes remain in the language in which they were entered; the application does not machine-translate evidence.
 
 ## What the terms mean
 
-| Term                          | Meaning in this prototype                                                         |
-| ----------------------------- | --------------------------------------------------------------------------------- |
-| Parcel                        | One fictional land record, identified by a reference such as `DEMO-P4-001`.       |
-| Baseline / starting ownership | The recorded distribution before the transactions being checked.                  |
-| Ownership event               | A documented change, such as a sale from one owner to another.                    |
-| Expected ownership            | The shares calculated by replaying the documented events from the baseline.       |
-| Mutation snapshot             | A separate supplied record of ownership, which may disagree with the calculation. |
-| Reconciliation run            | A saved comparison of expected ownership with a chosen mutation snapshot.         |
-| Finding / discrepancy         | An explained difference or evidence problem identified by a run.                  |
-| Review case                   | A human-review workflow attached to a run's findings.                             |
+| Term               | Meaning                                                               |
+| ------------------ | --------------------------------------------------------------------- |
+| Parcel             | A land record identified by a reference such as `DEMO-P4-001`.        |
+| Baseline           | The starting recorded ownership distribution, with source provenance. |
+| Event              | A documented transfer or allocation that changes expected interests.  |
+| Expected ownership | Interests reconstructed by replaying those events.                    |
+| Mutation snapshot  | A separate observed record to compare with the reconstruction.        |
+| Run                | A saved calculation containing its inputs and result.                 |
+| Review case        | Human review of a saved run's findings.                               |
 
-Shares are fractions **of the entire parcel**. For a 120-decimal parcel, `1/4` means an undivided interest equivalent to 30 decimals. Here, “decimal” is a land-area unit, not an instruction to enter a decimal number. These equivalents do not identify a physically surveyed piece of land.
+A share is a fraction **of the whole parcel**. On a 120-decimal parcel, `1/4` is equivalent to 30 decimals. “Decimal” here is a land-area unit—**শতক**—not a request to type decimal notation. An undivided share is not a surveyed physical boundary.
 
-## First-time setup
+## Public guided demonstration
 
-### 1. Install the prerequisites
+No account or working database connection is needed to use this demonstration after the frontend loads. It does not save changes.
 
-You need [Git](https://git-scm.com/downloads), [Node.js **24 LTS**](https://nodejs.org/en/download) and **npm** (included with Node.js). A code editor such as VS Code is useful for opening configuration files. Check your installation in a terminal:
+1. Open the homepage. Bangla is the default language; choose **English** at the top to switch. The moon/sun control changes the theme.
+2. Select **উদাহরণ দিয়ে বুঝুন / See how it works**.
+3. Choose the 120-decimal example or the concept note's 100-decimal example.
+4. **Starting owners:** inspect each person's initial share.
+5. **The sale:** see whose interest moves to the buyer. The other co-owners should retain their shares.
+6. **The mutation:** inspect the separately supplied recorded distribution.
+7. **Find the difference:** inspect owner-level differences calculated by the actual exact-fraction engine.
+8. **Check a correction:** choose **Use the corrected sample**. The engine recalculates and displays MATCH.
+9. To save calculations or review actions, open **Reviewer workspace** and sign in.
 
-```bash
-git --version
-node --version
-npm --version
-```
+For `DEMO-P4-001`, A sells 30 decimals equivalent to D. Expected areas are A 30, B 40, C 20, D 30; mutation shows A 30, B 25, C 20, D 45. B is short 15, D has 15 extra, and both totals equal 120.
 
-`node --version` should begin with `v24.`. If a command is not recognized, install the missing tool and reopen your terminal. Docker, a separate PostgreSQL installation, Supabase and API keys are **not required**: the local database runs inside the application using PGlite.
+For `DEMO-P4-011`, fictional Rahim sells 25 from his 60-decimal interest. Expected areas are 35, 40 and 25; mutation shows 35, 30 and 35. The hidden shift is 10 decimals, even though both totals equal 100.
 
-### 2. Get the project and install dependencies
+## First-time local setup
 
-For a new local checkout:
+Install [Git](https://git-scm.com/downloads) and [Node.js 24 LTS](https://nodejs.org/en/download), which includes npm. Verify with `git --version`, `node --version` and `npm --version`. Node should report `v24.*`.
 
 ```bash
 git clone https://github.com/void-pronway/BhuMi-Land-Reconciliation.git
 cd BhuMi-Land-Reconciliation
-npm ci
-```
-
-If the repository is already present, open a terminal in that folder and run `npm ci`; do not clone a second copy unnecessarily. All subsequent commands in this guide run from the folder containing `package.json`.
-
-### 3. Create your private reviewer configuration
-
-```bash
+npm ci --include=dev
 node scripts/local-credentials.mjs
-```
-
-The helper creates `.env.local` in the project root, containing a randomly generated reviewer password, a session-signing secret and the local database path. Its success message begins **“Created private .env.local.”** It does not print the password.
-
-Open `.env.local` in your editor. You will use the value after `REVIEWER_PASSWORD=` to sign in later. Keep this file private; it is excluded from Git.
-
-If the helper says **“.env.local exists; preserved without changes,”** it has not replaced any settings. Check that the existing file contains a nonempty `REVIEWER_PASSWORD` and a `SESSION_SECRET` of at least 32 characters. Merely copying `.env.example` leaves these credentials empty and does not enable reviewer access.
-
-### 4. Prepare the sample records
-
-With the application stopped, run:
-
-```bash
 npm run db:migrate
 npm run db:seed
-```
-
-Expect a message saying **“11 synthetic parcels available. Existing records preserved.”** These commands create the schema and missing sample parcels. Running them again does not reset your work or duplicate existing parcels.
-
-### 5. Start the application
-
-```bash
 npm run dev
 ```
 
-Keep that terminal open. When the server reports that it is ready, open `http://localhost:3000` in your browser. The first request may take a little longer while the application initializes.
+If you already have the repository, use that checkout. Run all commands from the folder containing `package.json`. No Docker, separate database server or external account is required for local development.
 
-On a fresh database, the overview shows **11 fictional parcels**, **0 reconciliation runs** and **0 open review cases**. That is expected: the sample records are loaded, but no comparisons have been saved yet. If someone has already used this database, the run and case counts will be higher.
+The credential helper creates or supplements an ignored `.env.local`, preserving existing values. Open it **privately in your editor** and read `ADMIN_EMAIL` and `ADMIN_PASSWORD`. The generated password is not printed. Do not share or commit this file.
 
-For a remote cloud workspace, use the access mechanism supplied by that workspace. `localhost` in your laptop's browser refers to your laptop, not the cloud machine. The administrator must configure `APP_ORIGIN` to match the exact browser origin used for reviewer actions.
+When the terminal reports that the server is ready, open `http://localhost:3000`. Keep the terminal running. In a remote workspace, use its supplied access mechanism; your laptop's localhost is not the remote machine.
 
-## Sign in as a simulated reviewer
+The migration/seed commands prepare eleven synthetic parcels and the first administrator account. They are repeatable and preserve existing data. The first backend request can also initialize a new database. A bootstrap account is created only once: changing `ADMIN_PASSWORD` later does **not** reset an existing account password.
 
-1. Click **Reviewer sign in** at the top right.
-2. In your editor, find `REVIEWER_PASSWORD` in `.env.local`.
-3. Copy only its value into the password field—not the variable name or the `=` sign.
-4. Click **Sign in**. The sidebar should now identify you as **Review officer**, and the top bar should offer **Sign out**.
+### Local environment variables
 
-There is no username, account-registration form or built-in universal password. This prototype uses one locally configured simulated reviewer identity. If someone else hosts the demo, ask that administrator for access through an appropriate private channel; do not share the entire configuration file.
+| Variable                           | Purpose                                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| `DATABASE_PATH=.data/bhumi`        | Embedded PostgreSQL directory, used only when `DATABASE_URL` is empty and not on Render.   |
+| `DATABASE_URL`                     | Optional hosted PostgreSQL connection URL; if set, it takes precedence over local storage. |
+| `APP_ORIGIN=http://localhost:3000` | Exact allowed browser origin, without a trailing slash.                                    |
+| `ADMIN_EMAIL`                      | Email address for the first administrator account.                                         |
+| `ADMIN_PASSWORD`                   | Initial administrator password, 12–128 characters.                                         |
+| `SEED_DEMO=true`                   | Load missing fictional fixtures. Set `false` for an intentionally empty database.          |
 
-| Public visitor                                                | Signed-in reviewer                            |
-| ------------------------------------------------------------- | --------------------------------------------- |
-| Browse synthetic parcels, supplied evidence and saved results | All public functions, plus run reconciliation |
-| Read existing cases and reports                               | Create cases and record review actions        |
-| Cannot change records                                         | Append revised synthetic mutation snapshots   |
+`.env.example` contains names and explanations, not usable credentials. The old shared-password variables are no longer used.
 
-Signing out does not delete saved work. A session expires after approximately eight hours; sign in again if an action requires authorization.
+### Stop and restart
 
-## Find your way around
+Press `Ctrl+C` to stop the server. Run `npm run dev` to restart it; signing out or restarting does not delete saved records. Only one process may use a local PGlite directory, so stop it before running migration/seed commands against that directory.
 
-| Screen / control              | What to use it for                                                                                                                                                    |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Overview**                  | See counts for this synthetic database and open the featured example with **Explore the discrepancy**. Counts describe saved runs and cases, not national statistics. |
-| **Parcel explorer**           | Search by parcel reference, title or mouza; click a parcel card to inspect it.                                                                                        |
-| **Reconciliation**            | Select a parcel, inspect starting ownership and events, choose a mutation snapshot, then run the comparison.                                                          |
-| **Review queue**              | Open existing findings, record notes and workflow actions, and inspect the audit trail.                                                                               |
-| **Printable evidence report** | Open a saved run's sources, comparison and review history in a separate tab.                                                                                          |
-
-There are two different selectors in the reconciliation workspace:
-
-- **Mutation snapshot** chooses the input for your **next** run. Changing it does not recalculate anything until you click **Run reconciliation**.
-- **Historical run** chooses a result that was **already saved**. It does not change the source records or rerun the engine.
-
-## Guided walkthrough: detect, review and correct a discrepancy
-
-Allow about 10–15 minutes for your first walkthrough. Use only the fictional values below.
-
-### Step 1 — Open the signature parcel
-
-From **Overview**, click **Explore the discrepancy**. Alternatively, search for `DEMO-P4-001` in **Parcel explorer**.
-
-Check that **Selected parcel** is `DEMO-P4-001` and the recorded area is **120 decimals**. The **Starting ownership** panel shows:
-
-| Party   | Starting share | Equivalent area |
-| ------- | -------------- | --------------: |
-| Owner A | `1/2`          |              60 |
-| Owner B | `1/3`          |              40 |
-| Owner C | `1/6`          |              20 |
-
-### Step 2 — Read the transaction and supplied mutation
-
-Expand **sale · SALE-001** in **Documented events**. Owner A transfers `1/4` of the whole parcel—30 decimals equivalent—to Buyer D. Owner B and Owner C do not participate.
-
-In **Mutation snapshot**, choose the original **SYN-MUTATION-001**. This matters if someone has already added a corrected snapshot. Expand **Inspect supplied mutation** to see the recorded shares before running the comparison. The **Source evidence** cards below describe the fictional baseline, deed and mutation documents.
-
-### Step 3 — Run the comparison
-
-Click **Run reconciliation**. The result should be **Conflict**, with this calculated comparison:
-
-| Party     | Expected area equivalent | Mutation area equivalent | Mutation minus expected |
-| --------- | -----------------------: | -----------------------: | ----------------------: |
-| Owner A   |                       30 |                       30 |                       0 |
-| Owner B   |                       40 |                       25 |                     −15 |
-| Owner C   |                       20 |                       20 |                       0 |
-| Buyer D   |                       30 |                       45 |                     +15 |
-| **Total** |                  **120** |                  **120** |                   **0** |
-
-Read the two **MUTATION_WRONG_SHARE** findings below the table. They identify Owner B's missing interest and Buyer D's excess interest, together with event/source references and a recommended review step. Both totals balance; the owner-by-owner allocation does not.
-
-After a run, expanding the sale also shows the reconstructed before-and-after states. A source marked **Supplied** is a provided demo record, not a legally verified document.
-
-![Calculated owner-by-owner differences](docs/screenshots/reconciliation.png)
-
-### Step 4 — Create a review case and request evidence
-
-1. Click **Create review case** below the result. It changes to **Review case created**.
-2. Open **Review queue** in the sidebar. Find the case for `DEMO-P4-001`; its status starts as **New**. If there are several cases, inspect their original findings to identify the one you just created.
-3. Under **Next action**, choose **under review**. Enter this example **Reviewer note**: `Compared the sale deed with the prior co-owner record.`
-4. Click **Record review action**. Confirm the status is **Under review**.
-5. Choose **needs evidence**, enter `Request a corrected fictional mutation allocation for Owner B and Buyer D.`, and click **Record review action** again.
-6. Check the **Audit trail** below the cases. It records the actions and reasons.
-
-Notes must contain at least five characters after surrounding whitespace is trimmed. The menu only offers valid next actions: a new case must enter **Under review** before it can be resolved. A reviewer can request evidence or escalate a case when a decision is not yet supported.
-
-### Step 5 — Add a corrected snapshot
-
-Click the case's `DEMO-P4-001` parcel link to return to reconciliation, then click **Append revised snapshot**.
-
-Enter these **fractions**, not area values or percentages:
-
-| Form field | Enter | Meaning on this parcel                                          |
-| ---------- | ----- | --------------------------------------------------------------- |
-| Owner A    | `1/4` | 30 decimals equivalent                                          |
-| Owner B    | `1/3` | 40 decimals equivalent                                          |
-| Owner C    | `1/6` | 20 decimals equivalent                                          |
-| Buyer D    | `1/4` | 30 decimals equivalent                                          |
-| Buyer E    | `0`   | No interest; this extra fictional party is not part of the sale |
-
-Use the **Evidence / reason** note: `New synthetic mutation allocation matches the supplied sale deed and prior co-owner record.` Then click **Save new snapshot**.
-
-Supported inputs include `1/3`, `0` and `1`. Do not enter `30`, `25%` or `0.25` to mean a quarter share: `30` means thirty whole-parcel shares, and percentage/decimal notation is not supported. Negative shares and zero denominators such as `1/0` are invalid.
-
-This action appends a new fictional observation and an evidence note. It does not edit the original mutation or upload a document. The current demo assigns appended snapshots a fixed effective date of **2026-04-01**; date editing is not implemented.
-
-### Step 6 — Verify the correction and preserve the history
-
-The newly saved snapshot is selected automatically and has a reference beginning **SYN-AMENDMENT-**. Click **Run reconciliation** again.
-
-Expect **Match** and the message **“The supplied ownership records reconcile.”** All owner differences should now be zero. If the old conflict is still displayed immediately after saving, that is expected until you run the new calculation.
-
-Use **Historical run** to select the earlier **CONFLICT** result. The original −15/+15 findings remain. Select the new **MATCH** run to return to the corrected comparison. The correction does not erase the original case or automatically resolve it.
-
-### Step 7 — Resolve the review case with a note
-
-Return to **Review queue**. For the case left in **Needs evidence**:
-
-1. Choose **under review**, enter a note saying the revised snapshot was received, and save the action.
-2. Choose **resolved**, enter `The new reconciliation run matches the supplied records; the earlier finding is retained for audit.`, and save again.
-3. Confirm the case reads **Resolved** and the audit trail contains both actions.
-
-Resolving the case records the reviewer's decision. It does not change the old run from CONFLICT to MATCH. A resolved case can be reopened by returning it to **Under review**.
-
-### Step 8 — Open or print the evidence report
-
-Return to the parcel, choose the desired **Historical run**, and click **Printable evidence report**. In the new tab, click **Print / Save as PDF**, then choose your browser's print or PDF destination.
-
-The report shows the selected run's calculation, captured sources and event sequence, together with its current review outcome and audit history. To demonstrate traceability, open the original conflicting run's report after resolving its case: the finding should still be visible.
-
-**Walkthrough complete:** you have detected an error, recorded human review, verified a corrected record, and retained the original evidence.
-
-## Understand the results
-
-| Outcome                   | Meaning                                                                              | Suggested next step                                                                         |
-| ------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| **MATCH**                 | The supplied records reconcile under the supported assumptions.                      | Inspect the sources and retain the report. This is not legal-title approval.                |
-| **CONFLICT**              | The engine found a specific inconsistency.                                           | Read the owner differences and source references; open a review case.                       |
-| **INSUFFICIENT_EVIDENCE** | A baseline, source, dependency or other required connection is missing or ambiguous. | Supply or clarify evidence before relying on a calculated allocation.                       |
-| **REVIEW_REQUIRED**       | The replay could not safely complete, or evidence needs interpretation/verification. | Inspect the finding and seek human review; do not treat a partial state as final ownership. |
-
-Evidence status is separate from the calculation outcome. **Complete supplied** means the required references were supplied for this calculation; it does not certify their legal authenticity. A discrepancy is not automatically a fraud allegation.
-
-## Try the other scenarios
-
-Open **Parcel explorer**, search for a reference, and run reconciliation as a reviewer. The outcomes below apply to the **original seeded snapshot**, before any revised inputs are added.
-
-| Parcel        | What it demonstrates                                               | Expected outcome                                |
-| ------------- | ------------------------------------------------------------------ | ----------------------------------------------- |
-| `DEMO-P4-001` | Hidden co-owner loss despite equal totals                          | CONFLICT                                        |
-| `DEMO-P4-002` | Clean partial sale                                                 | MATCH                                           |
-| `DEMO-P4-003` | Registered sale with no mutation supplied                          | INSUFFICIENT_EVIDENCE; missing-mutation finding |
-| `DEMO-P4-004` | Transfer larger than the sender's interest                         | REVIEW_REQUIRED; over-transfer finding          |
-| `DEMO-P4-005` | Mutation gives interest to the wrong recipient                     | CONFLICT                                        |
-| `DEMO-P4-006` | Mutation references a transaction twice                            | CONFLICT                                        |
-| `DEMO-P4-007` | Missing prerequisite succession evidence                           | INSUFFICIENT_EVIDENCE                           |
-| `DEMO-P4-008` | Transfer depends on a later event                                  | INSUFFICIENT_EVIDENCE                           |
-| `DEMO-P4-009` | Exact thirds, sixths and twelfths                                  | MATCH                                           |
-| `DEMO-P4-010` | Explicit correction event retained in replay history               | MATCH                                           |
-| `DEMO-P4-011` | Concept note's 100-decimal example, with a hidden 10-decimal shift | CONFLICT                                        |
-
-## Stop, restart and repeat the demo
-
-- **Stop:** press `Ctrl+C` in the terminal running the application.
-- **Restart development:** from the project folder, run `npm run dev` again. You do not need to reinstall or reseed each time.
-- **Keep your work:** runs, snapshots, cases and audit entries persist in `.data/bhumi` by default. Signing out, refreshing the browser and restarting the application do not remove them.
-- **Repeat the original example:** choose **SYN-MUTATION-001** in **Mutation snapshot**, then run again. This creates another historical run; it does not reset previous work.
-- **Revisit a result without creating another run:** use **Historical run**.
-
-Only one process may own a PGlite data directory. Stop the app before running migration/seed commands against that directory, and do not launch development and production servers against it simultaneously.
-
-For a fresh practice dataset without deleting your existing work, stop the app, change `DATABASE_PATH` in `.env.local` to a new unused path such as `.data/practice-02`, run the migration/seed commands, and start the app again. To return to your previous records, stop the app and restore the original path. Keep `.env.local` private throughout.
-
-### Run a production build locally
-
-Stop the development server first:
+For a production-mode local run, stop development first:
 
 ```bash
 npm run build
 npm run start
 ```
 
-Open the same browser origin. Rebuild after source changes when using production mode. This local persistence adapter is not suitable for ephemeral/serverless deployment; connecting a hosted database requires an implemented adapter and migration process, not just a Supabase URL.
+To use another port, set `APP_ORIGIN=http://localhost:3005`, restart with `npm run dev -- --port 3005`, and use that exact browser address. For production use `npm run start -- --port 3005`.
 
-## Deploy manually on Render
+## Reviewer walkthrough
 
-Create a **Node Web Service** connected to this repository's `main` branch. Use a paid service with a persistent disk and one instance for the embedded database.
+### 1. Sign in
 
-| Setting                    | Value                                   |
-| -------------------------- | --------------------------------------- |
-| Root directory             | Leave empty                             |
-| Build command              | `npm ci --include=dev && npm run build` |
-| Start command              | `npm run start -- --port $PORT`         |
-| Auto-deploy                | Off for manual deployments              |
-| Persistent disk mount path | `/var/data`                             |
-| Health check path          | `/api/workspace`                        |
+Open **পর্যালোচকের কর্মক্ষেত্র / Reviewer workspace**. Enter your individual email address and password. For your local administrator, use the private values from `.env.local`. On a hosted installation, your administrator provides your account privately.
 
-**Keep `--include=dev` in the build command.** When `NODE_ENV=production`, a plain `npm ci` omits development dependencies. Next.js still needs Tailwind's PostCSS plugin and TypeScript during the build. Omitting them causes errors such as `Cannot find module '@tailwindcss/postcss'`. Including build tools does not change the application to development mode: `next build` and `next start` still produce and serve a production application.
+There is no public registration or universal password. Reviewers only see assigned parcels; administrators can access all parcels and manage accounts. Sessions expire after eight hours. Sign-out, revocation and password changes invalidate server-side sessions.
 
-Configure these variables in Render's Environment settings:
+### 2. Open a parcel and inspect its inputs
 
-| Variable            | Value                                                              |
-| ------------------- | ------------------------------------------------------------------ |
-| `NODE_VERSION`      | `24.19.0`                                                          |
-| `NODE_ENV`          | `production`                                                       |
-| `DATABASE_PATH`     | `/var/data/bhumi`                                                  |
-| `REVIEWER_PASSWORD` | Your strong, private reviewer password                             |
-| `SESSION_SECRET`    | A random secret of at least 32 characters                          |
-| `APP_ORIGIN`        | The exact assigned HTTPS service address, without a trailing slash |
+In **Assigned parcels**, open `DEMO-P4-001`. Lists have six records per page; use **Next page** for later examples. A reviewer with no grants sees an explanatory empty state.
 
-Do not upload `.env.local`. The persistent disk is available at runtime, not during the build, so do not add migration or seed commands to Render's build command. The first application request initializes the database and missing synthetic records automatically.
+Inspect **Starting ownership** and expand the **Documented events**. The sale transfers `1/4` of the whole parcel from A to D. Source identifiers remain unchanged in both languages so they stay traceable. Document text and reviewer notes are displayed in their original language.
 
-For an existing failed deployment, change **Settings → Build Command** to the value above, save it, then choose **Manual Deploy → Deploy latest commit**. Keep `NODE_ENV=production`. A “No build cache found” warning does not cause the missing-module error.
+Choose the original `SYN-MUTATION-001` under **Mutation snapshot**, especially if someone has already added a correction.
 
-After deployment, open the service, sign in, run `DEMO-P4-001` and create a review case. Restart the service and confirm that both the run and case remain. This validates the persistent-disk configuration. Local build verification does not establish that a Render deployment has succeeded.
+### 3. Save the comparison
+
+Click **Run reconciliation**. The result shows B −15 and D +15, with both totals at 120. Expand calculation details to see rule codes and event/source IDs.
+
+**Mutation snapshot** selects the input for your next calculation. **Previous calculations** opens an already-saved result. Changing the input does not calculate or rewrite anything until you run the engine.
+
+Each run is saved independently; rerunning the original snapshot is permitted and creates another run. This differs from duplicate event processing: one event is never applied twice within a valid replay.
+
+### 4. Open and act on a case
+
+Under the result, enter a **Reason for opening this review**, such as `Compare the co-owner allocation with the deed.`, then click **Create review case**. A run can have one case; repeated creation does not duplicate it.
+
+Open **Review queue**. For the new case:
+
+1. Choose **Under review**, write `Checked the deed and prior co-owner record.`, then **Record review action**.
+2. Choose **Needs evidence**, write `Request a corrected mutation allocation.`, and save again.
+3. Open **Activity history** to inspect the actor, action and reason.
+
+Notes must contain at least five characters after trimming. Only valid next actions are offered. If someone updates the same case while you are editing, the server rejects your stale version and asks you to refresh rather than overwriting their decision.
+
+### 5. Append a corrected snapshot
+
+Return to **Assigned parcels**, reopen `DEMO-P4-001`, and select **Add a revised snapshot**.
+
+| Field   | Enter | Equivalent area |
+| ------- | ----- | --------------: |
+| Owner A | `1/4` |              30 |
+| Owner B | `1/3` |              40 |
+| Owner C | `1/6` |              20 |
+| Buyer D | `1/4` |              30 |
+| Buyer E | `0`   |               0 |
+
+Bangla digits such as `১/৩` are also accepted by this form. Do not enter `30` to mean 30 decimals: a share field is a fraction of the whole parcel. Percent notation and decimal notation such as `25%` or `0.25` are not supported. Negative shares, zero denominators, shares above one, duplicate parties and unknown parties are rejected.
+
+Select an effective date on or after the baseline and supplied events; `2026-04-01` works for this example. Enter an **Evidence / reason** note, then **Save new snapshot**. If a newer snapshot was saved concurrently, refresh and inspect it before trying again.
+
+The system retains the old snapshot. Deliberately unequal aggregate mutation totals can still be recorded for comparison: the engine must be able to report incorrect observed records, rather than silently “repairing” them. Each individual share must still be valid.
+
+### 6. Reconcile again and resolve the case
+
+The new snapshot is selected automatically. Click **Run reconciliation** and expect MATCH. Open the earlier result under **Previous calculations** to verify that its conflict remains.
+
+Go to **Review queue**. From **Needs evidence**, first record **Under review**, then **Resolved**, each with a meaningful note. Resolution changes case status, not the old calculation. A resolved case can be reopened.
+
+### 7. Print the report
+
+From a saved result, choose **Open printable report**. The protected report opens in another tab and offers a language switch and **Print / save PDF**. It contains the run's captured calculation, source documents, event transformations, current review outcome and recent case audit entries.
+
+The report remains accessible only to authorized users, even if someone shares its URL. Keep any exported PDF within the authorized review process.
+
+## Team access and passwords
+
+An administrator can open **Team access**, enter the reviewer's name, email, a unique initial password of at least 12 characters, and comma-separated parcel IDs such as `DEMO-P4-001, DEMO-P4-002`. Only those parcels become accessible. Existing grants cannot be edited through this prototype UI; revoke an account if its access is no longer appropriate.
+
+Share the initial password privately. The reviewer should open **My account → Change password** after first sign-in. A password change signs out all sessions; sign in again with the new password. **Revoke access** disables an account and invalidates its sessions immediately for subsequent requests. The interface cannot revoke the administrator's own account.
+
+Email-based recovery and MFA are not implemented. Protect your administrator access and database provider account. Do not put passwords into review notes or public issue reports.
+
+## Understand outcomes
+
+| Outcome               | Meaning                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| MATCH                 | Supplied interests reconcile under the supported assumptions; not legal-title approval. |
+| CONFLICT              | A specific owner allocation or record-linkage discrepancy was found.                    |
+| INSUFFICIENT_EVIDENCE | Required sources or ordering links are missing or ambiguous.                            |
+| REVIEW_REQUIRED       | Replay could not safely complete, or a source requires interpretation/verification.     |
+
+Evidence completeness is separate from authenticity. “Sources supplied” does not mean legally verified. A discrepancy is not automatically a fraud allegation. A stopped replay may display a partial state; do not treat it as a final expected allocation.
+
+## Try all eleven scenarios
+
+The following outcomes refer to the original seeded inputs:
+
+| Parcel      | Example                               | Outcome               |
+| ----------- | ------------------------------------- | --------------------- |
+| DEMO-P4-001 | Hidden co-owner loss, 120 decimals    | CONFLICT              |
+| DEMO-P4-002 | Clean partial sale                    | MATCH                 |
+| DEMO-P4-003 | Sale with no mutation supplied        | INSUFFICIENT_EVIDENCE |
+| DEMO-P4-004 | Excessive transfer                    | REVIEW_REQUIRED       |
+| DEMO-P4-005 | Wrong mutation recipient              | CONFLICT              |
+| DEMO-P4-006 | Repeated transaction reference        | CONFLICT              |
+| DEMO-P4-007 | Missing succession prerequisite       | INSUFFICIENT_EVIDENCE |
+| DEMO-P4-008 | Out-of-order dependency               | INSUFFICIENT_EVIDENCE |
+| DEMO-P4-009 | Exact fractional transfers            | MATCH                 |
+| DEMO-P4-010 | Documented reallocating correction    | MATCH                 |
+| DEMO-P4-011 | Hidden 10-decimal shift, 100 decimals | CONFLICT              |
 
 ## Troubleshooting
 
-| Symptom                                                   | What to check or do                                                                                                                                                                                 |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `node`, `npm` or `git` is not recognized                  | Install the missing prerequisite, reopen the terminal, and check its version. Use Node 24.                                                                                                          |
-| npm cannot find `package.json`                            | Change into the `BhuMi-Land-Reconciliation` folder before running project commands.                                                                                                                 |
-| Dependency installation fails                             | Check network access and Node version. Retry `npm ci` after fixing the reported cause. For a restricted cloud machine whose default cache is unwritable, use `npm ci --cache /tmp/bhumi-npm`.       |
-| `.env.local` is not visible                               | Show hidden files or open the project root in your editor. Run the credentials helper if the file does not exist.                                                                                   |
-| “Reviewer access is not configured” or incorrect password | Check the existing `.env.local`: password must be nonempty and session secret at least 32 characters. The helper preserves existing files. Restart after configuration changes, then sign in again. |
-| **Run reconciliation** or review buttons are disabled     | Sign in as a reviewer. A MATCH run has no findings to open a case for; an existing case also disables duplicate case creation for that run.                                                         |
-| Invalid origin / authorization error after signing in     | Use the exact configured browser origin. `localhost` and `127.0.0.1` differ; so do HTTP/HTTPS and port numbers. Check `APP_ORIGIN`, restart, and sign in again.                                     |
-| Port 3000 is already occupied                             | Stop the other server if it is yours, or choose another port and update `APP_ORIGIN` as shown below. Do not leave the old and new processes using the same database.                                |
-| Database is locked or cannot open                         | Stop other processes using that data directory. Check that `DATABASE_PATH` is writable. Do not delete the database as a first troubleshooting step.                                                 |
-| The “corrected” comparison still shows a conflict         | Check the selected snapshot, verify the fractions in the walkthrough, click **Run reconciliation**, and choose the latest run. Saving a snapshot alone does not calculate a new result.             |
-| Cannot resolve a case                                     | A case must be **Under review** first. From **Needs evidence**, record an **under review** action, then a **resolved** action, each with a note.                                                    |
-| Reseeding did not restore the original dashboard counts   | Seeding preserves existing work. Select the original snapshot or use a separate practice database instead of expecting a reset.                                                                     |
-| Print report does not open                                | Allow the new browser tab. Choose a saved run first; reports belong to runs.                                                                                                                        |
-| Browser tests cannot find Chromium                        | Run `npx playwright install chromium`, or configure an existing Chromium executable as described below.                                                                                             |
+| Symptom                                       | Next step                                                                                                                                                                          |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build cannot find `@tailwindcss/postcss`      | Use `npm ci --include=dev && npm run build`. Build tools are needed even with `NODE_ENV=production`.                                                                               |
+| Hosted workspace cannot load                  | Check `DATABASE_URL`, provider connectivity, Render runtime logs and `/api/health`. Free instances may need time to wake up. The public demo still works after the frontend loads. |
+| Old shared password no longer works           | Use the new administrator email/password or an assigned individual account. See the upgrade guide.                                                                                 |
+| Invalid-origin message                        | Set `APP_ORIGIN` to the exact browser origin, including HTTPS and custom domain, without a trailing slash; restart.                                                                |
+| No assigned parcels                           | Ask the administrator for parcel access; use the public demo while waiting.                                                                                                        |
+| A password changed but old access still fails | Bootstrap variables create an account once. Change an existing password through **My account**; changing the environment variable is not a password reset.                         |
+| Stale review/snapshot error                   | Refresh, inspect the newer record, then resubmit a deliberate change.                                                                                                              |
+| Latest result still shows an old conflict     | Save the revised snapshot, select it, and run a new comparison. Select that new run under Previous calculations.                                                                   |
+| Local database locked                         | Stop the other process using that directory. Do not delete records as the first troubleshooting step.                                                                              |
+| Want a fresh local practice dataset           | Stop the app, use a new `DATABASE_PATH` such as `.data/practice-02`, seed and restart. Keep the old directory to return to it.                                                     |
+| New account not visible in the list           | Use account pagination; lists show ten items per page.                                                                                                                             |
+| Login throttled                               | Wait for the account's 15-minute attempt window. Global login throttling uses a one-minute window.                                                                                 |
 
-For example, to use port **3005**, add this line to `.env.local`:
-
-```dotenv
-APP_ORIGIN=http://localhost:3005
-```
-
-Then start the app with `npm run dev -- --port 3005` and open `http://localhost:3005`. For production mode use `npm run start -- --port 3005`. Restart after changing environment settings. Use HTTPS and an explicitly configured origin for remotely accessed instances.
-
-## Developer checks
-
-You do not need to run these checks just to try the prototype. They are useful when changing code or preparing a submission. From the project folder:
+## Developer verification
 
 ```bash
 npm test
@@ -383,54 +253,32 @@ npm run test:e2e
 npm run test:restart
 ```
 
-Stop your development server before building. Browser tests require the production build and free port **3001**; the restart check uses port **3002**. Avoid exporting your demo `DATABASE_PATH` into the test terminal: the browser-test configuration preserves an already exported value. With no such override, tests use separate `.data/e2e-*` and `.data/restart-*` directories and do not reset the main demo database.
+Browser tests use port 3001 and dedicated embedded data directories, synthetic credentials and a fresh administrator. Restart tests use port 3002. They override ordinary database settings for isolation. **Only set `TEST_DATABASE_URL` to a disposable test database**: it is the explicit opt-in for testing the external adapter and will receive synthetic fixtures and test accounts. Never use a real or shared database for it.
 
-If Chromium is already installed, skip its download. On Linux, with Chromium at the example path:
+If system Chromium is available on Linux, use `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e`. In PowerShell, set `$env:PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to the actual executable path, then run the test command.
 
-```bash
-PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e
-```
+The CI workflow includes PostgreSQL 17 and tests both adapters. Remote CI completion is not inferred from local success. Tests update screenshots in `docs/screenshots/`; temporary traces stay in ignored `test-results/`.
 
-For PowerShell, set the actual executable path before running the command:
+See [measured validation](docs/validation.md), [architecture](docs/architecture.md), and [security boundaries](docs/security.md).
 
-```powershell
-$env:PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = 'C:\path\to\chrome.exe'
-npm run test:e2e
-```
+## Responsible use and project ownership
 
-Failure traces and temporary screenshots are stored under ignored `test-results/`. Browser tests also refresh the tracked demonstration screenshots in `docs/screenshots/`; inspect those changes before committing.
+Use fictional or explicitly authorized records only. No genuine NIDs, portal scraping, live government integration, document upload service or external AI ownership decisions are included. Free hosting does not establish legal suitability for real sensitive records. Backups, recovery, institutional policy, independent security review and domain validation remain prerequisites for such use.
 
-[Measured validation results](docs/validation.md) distinguish executed checks from limitations. Tests prove behavior on synthetic inputs, not effectiveness on real national records. For a short presentation after completing the walkthrough, see the [90-second recording script and finalist demo guide](docs/demo.md).
+The concept note and master development prompt were inspected. The official rulebook, strategy report and official logo were not supplied. The inspiration site's live domain remained inaccessible from the development environment after retry; the redesign is original and makes no claims about that site's implementation.
 
-## Screenshots
+Institutional background, not proof of legal completeness:
 
-These are captures of the actual application: [dashboard](docs/screenshots/dashboard.png), [reconciliation](docs/screenshots/reconciliation.png), and [mobile](docs/screenshots/mobile-dashboard.png). An original temporary wordmark is included; the official logo was not supplied.
-
-![BhuMi reviewer dashboard](docs/screenshots/dashboard.png)
-
-## Security and privacy
-
-Only fictional records are seeded. No genuine NIDs, private records, portal scraping, speculative government APIs or external accounts are used. Server-side reviewer checks, strict-origin checks, signed HttpOnly session cookies, parameterized queries, input validation and database transactions protect the prototype workflow. Login throttling is process-local and intentionally simple.
-
-This is a single-instance demo with one shared reviewer identity, not production IAM. Public reads include synthetic evidence and audit information; real personal data would require per-record authorization and redaction. Database administrators can alter stored data: append-only application behavior is not a tamper-proof guarantee. Do not expose real data or claim legal certification.
-
-## Sources and project ownership
-
-Inspected: the supplied **BhuMi Concept Note** and **Master Development Prompt**. Not supplied: official rulebook, strategy report, competitor concept note, official logo. Compliance claims from those missing sources have not been independently checked. Original implementation; no competitor code, layout or branding copied.
-
-Institutional context (not proof of legal completeness):
-
-- [Bangladesh State Acquisition and Tenancy Act, 1950, section 89](https://bdlaws.minlaw.gov.bd/act-241/section-7068.html).
+- [State Acquisition and Tenancy Act, 1950, section 89](https://bdlaws.minlaw.gov.bd/act-241/section-7068.html).
 - [World Bank, Bangladesh Land Acquisition Diagnostic Review (2022)](https://documents1.worldbank.org/curated/en/099359509012228968/pdf/IDU05ea6dbd70b70e04c7f0b5ef06fbc25ad4670.pdf).
-- The supplied concept note additionally cites Daily Sun (18 August 2025), Bangladesh Post (4 October 2024), and BSS (24 November 2025). Their claims were not independently reverified during implementation.
 
-**AI assistance disclosure:** OpenAI ChatGPT (GPT-6) and Codex assisted with architecture, implementation, tests and documentation. Student developers must review, understand and demonstrate the submitted work. Ownership outcomes are deterministic rules, not AI judgments.
+**AI assistance:** OpenAI ChatGPT (GPT-6) and Codex assisted with planning, code, tests and documentation. Student developers must understand, review and demonstrate the work. Ownership results come from deterministic rules, not AI judgments. Bangla wording should receive a fluent domain expert's review before institutional use.
 
 Team lead: [Name, DIU ID] · Student developer: [Name, DIU ID] · Faculty mentor: [Name, Department] · Industry mentor: [Name, Organisation].
 
-Dependencies include Next.js, React, TypeScript, Tailwind CSS, Lucide, Zod, Drizzle ORM, PGlite, Vitest, Playwright and Prettier; their respective upstream licenses apply. No project license has been selected on the team’s behalf.
+Dependencies include Next.js, React, TypeScript, Tailwind, Lucide, Zod, Drizzle, node-postgres, PGlite, Inter, Noto Sans Bengali, Vitest, Playwright and Prettier. Their respective upstream licenses apply. No project license has been selected on the team's behalf.
 
 ## Changelog
 
-- Initial working prototype: exact engine, eleven synthetic fixtures, persistent reviewer workflow, report, automated tests and demo documentation.
-- Post–Round 1 improvements: to be recorded by the team after submission; none claimed yet.
+- **Rebuild:** bilingual guided UX, light/dark themes, private reviewer access, scoped accounts, durable PostgreSQL adapter, pagination, concurrency guards, improved validation and deployment instructions.
+- **Initial prototype:** exact engine, eleven synthetic fixtures, review cases, printable reports and demonstration deck.

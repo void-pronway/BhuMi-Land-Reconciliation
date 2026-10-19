@@ -1,1107 +1,1155 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import {
-  LayoutDashboard,
-  Layers3,
-  GitBranch,
-  ClipboardCheck,
-  ArrowUpRight,
   ArrowRight,
-  Search,
+  ArrowUpRight,
+  ArrowLeft,
+  Layers3,
+  Sun,
+  Moon,
+  Globe2,
   ShieldCheck,
-  LogOut,
-  Landmark,
+  GitBranch,
   FileText,
   Check,
-  AlertTriangle,
-  Plus,
-  Play,
+  LockKeyhole,
+  Users,
+  Leaf,
+  Scale,
   Menu,
+  RefreshCw,
+  LogOut,
+  Plus,
+  Printer,
+  ChevronRight,
 } from "lucide-react";
-import type { Parcel, Result, State } from "@/lib/domain/reconciliation/types";
+import { usePreferences } from "./preferences";
+import { ResultView, Ownership, Badge } from "./results";
+import { scenarios } from "@/lib/domain/reconciliation/scenarios";
+import { reconcileMutation } from "@/lib/domain/reconciliation/engine";
+import { area } from "@/lib/domain/reconciliation/fraction";
+import { partyName, parcelTitle, asciiDigits } from "@/lib/i18n";
+import type { Parcel } from "@/lib/domain/reconciliation/types";
+import type { User } from "@/lib/auth";
 import type { Run, Review, Audit } from "@/lib/db";
-import { area, fraction } from "@/lib/domain/reconciliation/fraction";
+type Listing = { id: string; title: string; area: string };
+type SummaryRun = { id: string; status: string; created_at: string };
 type Data = {
-  parcels: Parcel[];
-  runs: Run[];
-  reviews: Review[];
+  user: User;
+  parcels: Listing[];
+  total: number;
+  parcel: Parcel | null;
+  runs: SummaryRun[];
+  reviews: (Review & { parcel_id: string; outcome: string })[];
   audit: Audit[];
-  reviewer: boolean;
-  authConfigured: boolean;
 };
-const label = (s: string) => s.toLowerCase().replaceAll("_", " ");
-function Badge({ value }: { value: string }) {
+export async function api<T>(
+  url: string,
+  body?: unknown,
+  method?: string,
+): Promise<T> {
+  const response = await fetch(url, {
+    method: method ?? (body ? "POST" : "GET"),
+    cache: "no-store",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(45000),
+  }).catch(() => {
+    throw new Error("SERVICE_UNAVAILABLE");
+  });
+  const data = await response
+    .json()
+    .catch(() => ({ error: "SERVICE_UNAVAILABLE" }));
+  if (!response.ok) throw new Error(data.error ?? "SERVICE_UNAVAILABLE");
+  return data as T;
+}
+export function Brand() {
+  const { lang, t } = usePreferences();
   return (
-    <span
-      className={`badge ${value === "MATCH" || value === "RESOLVED" ? "green" : value === "CONFLICT" ? "red" : "amber"}`}
-    >
-      {label(value)}
+    <span className="brand">
+      <span className="brand-symbol">
+        <Layers3 size={27} />
+      </span>
+      <span>
+        <b>{lang === "bn" ? "ভূমি" : "BhuMi"}</b>
+        <small>{t("brandTag")}</small>
+      </span>
     </span>
   );
 }
-function ShareBar({
-  state,
-  parties,
-}: {
-  state: State;
-  parties: Record<string, string>;
-}) {
+export function PreferenceControls() {
+  const { lang, t, setLang, toggleTheme, theme } = usePreferences();
   return (
-    <div className="sharebar">
-      {Object.entries(state).map(([id, share], i) => {
-        const f = fraction(share);
-        return (
-          <div
-            key={id}
-            title={`${parties[id]}: ${share}`}
-            style={{
-              width: `${Math.max(0, (Number(f.n) / Number(f.d)) * 100)}%`,
-              background: [
-                "#153d50",
-                "#148779",
-                "#7bbdb0",
-                "#df9a54",
-                "#8494ad",
-              ][i % 5],
-            }}
-          />
-        );
-      })}
+    <div className="preferences">
+      <button
+        className="language"
+        onClick={() => setLang(lang === "en" ? "bn" : "en")}
+        aria-label={lang === "en" ? "বাংলা" : "English"}
+      >
+        <Globe2 size={15} />
+        {lang === "en" ? "বাংলা" : "English"}
+      </button>
+      <button
+        className="icon-button"
+        aria-label={t("theme")}
+        title={t("theme")}
+        onClick={toggleTheme}
+      >
+        {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
+      </button>
     </div>
   );
 }
-export default function Workspace() {
-  const [data, setData] = useState<Data>(),
+export default function Workspace({
+  initialView = "home",
+}: {
+  initialView?: string;
+}) {
+  const { t, n } = usePreferences();
+  const [view, setView] = useState(initialView),
+    [user, setUser] = useState<User | null>(null),
+    [menu, setMenu] = useState(false);
+  const go = (next: string) => {
+    setView(next);
+    setMenu(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  return (
+    <div className="site">
+      <header className="site-header">
+        <button
+          className="brand-button"
+          onClick={() => go("home")}
+          aria-label={t("home")}
+        >
+          <Brand />
+        </button>
+        <nav className={menu ? "open" : ""}>
+          <button
+            className={view === "home" ? "selected" : ""}
+            onClick={() => go("home")}
+          >
+            {t("home")}
+          </button>
+          <button
+            className={view === "demo" ? "selected" : ""}
+            onClick={() => go("demo")}
+          >
+            {t("demo")}
+          </button>
+          <button
+            className={view === "workspace" ? "selected" : ""}
+            onClick={() => go("workspace")}
+          >
+            {t("workspace")}
+          </button>
+        </nav>
+        <div className="header-tools">
+          <PreferenceControls />
+          <button
+            className="button small header-login"
+            onClick={() => go("workspace")}
+          >
+            {user ? user.display_name : t("signIn")}
+            <ArrowUpRight size={15} />
+          </button>
+          <button
+            className="icon-button mobile-menu"
+            aria-label={t("menu")}
+            onClick={() => setMenu(!menu)}
+          >
+            <Menu size={20} />
+          </button>
+        </div>
+      </header>
+      {view === "home" ? (
+        <Home onDemo={() => go("demo")} onWork={() => go("workspace")} />
+      ) : view === "demo" ? (
+        <Demo onWork={() => go("workspace")} />
+      ) : (
+        <Reviewer onUser={setUser} />
+      )}
+      <footer className="site-footer">
+        <div>
+          <Brand />
+          <p>{t("footer")}</p>
+        </div>
+        <div>
+          <span>{t("prototype")}</span>
+          <p>{t("privacy")}</p>
+          <small>© {n(2026)} BhuMi · LandTech</small>
+        </div>
+      </footer>
+    </div>
+  );
+}
+function Home({ onDemo, onWork }: { onDemo: () => void; onWork: () => void }) {
+  const { t, n, lang } = usePreferences();
+  const p = scenarios()[10],
+    r = reconcileMutation(p);
+  return (
+    <main className="public-main">
+      <section className="hero">
+        <div className="hero-copy">
+          <div className="eyebrow">
+            <span />
+            {t("eyebrow")}
+          </div>
+          <h1>{t("hero")}</h1>
+          <p>{t("heroText")}</p>
+          <div className="button-row">
+            <button className="button" onClick={onDemo}>
+              {t("heroPrimary")}
+              <ArrowRight size={18} />
+            </button>
+            <button className="button ghost" onClick={onWork}>
+              {t("signIn")}
+              <LockKeyhole size={16} />
+            </button>
+          </div>
+          <div className="hero-assurance">
+            <ShieldCheck size={16} />
+            {t("synthetic")}
+          </div>
+        </div>
+        <div className="hero-illustration">
+          <div className="land-art" aria-hidden="true">
+            <div className="plot plot-a">
+              <Leaf size={28} />
+              <span>{lang === "bn" ? "ক" : "A"}</span>
+            </div>
+            <div className="plot plot-b">
+              <Leaf size={20} />
+              <span>{lang === "bn" ? "খ" : "B"}</span>
+            </div>
+            <div className="plot plot-c">
+              <Layers3 size={25} />
+            </div>
+            <div className="plot-road" />
+          </div>
+          <div className="floating-label">
+            <span className="pulse" />
+            {t("featureLabel")}
+          </div>
+          <div className="hero-record">
+            <div className="mini-heading">
+              <FileText size={18} />
+              <span>DEMO-P4-011</span>
+              <span className="tiny-tag">{t("synthetic")}</span>
+            </div>
+            <div className="mini-total">
+              <span>{t("sameTotal")}</span>
+              <b>
+                {n(100)} <small>{t("decimal")}</small>
+              </b>
+            </div>
+            <div className="mini-difference">
+              <span>{partyName(p.parties.B, lang)}</span>
+              <strong>−{n(area("1/10", p.area))}</strong>
+              <span>{t("missing")}</span>
+            </div>
+            <div className="mini-difference">
+              <span>{partyName(p.parties.D, lang)}</span>
+              <strong>+{n(area("1/10", p.area))}</strong>
+              <span>{t("extra")}</span>
+            </div>
+            <button onClick={onDemo}>
+              {t("compare")}
+              <ArrowRight size={17} />
+            </button>
+          </div>
+          <div className="illustration-caption">
+            {n(r.findings.length)} {t("differences")}
+          </div>
+        </div>
+      </section>
+      <section className="trust-strip">
+        {[
+          ["trust1", "trust1Text", Scale],
+          ["trust2", "trust2Text", ShieldCheck],
+          ["trust3", "trust3Text", GitBranch],
+        ].map(([a, b, Icon]) => {
+          const C = Icon as typeof Scale;
+          return (
+            <div key={String(a)}>
+              <C size={24} />
+              <div>
+                <strong>{t(String(a))}</strong>
+                <p>{t(String(b))}</p>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+      <section className="how-section" id="how">
+        <div className="section-heading">
+          <div className="eyebrow">{t("how")}</div>
+          <h2>{t("flowTitle")}</h2>
+          <p>{t("flowText")}</p>
+        </div>
+        <div className="steps-grid">
+          {[1, 2, 3, 4].map((i) => (
+            <article key={i}>
+              <span className="step-number">{n(`0${i}`)}</span>
+              <h3>{t(`flow${i}`)}</h3>
+              <p>{t(`flow${i}Text`)}</p>
+              <ChevronRight className="step-arrow" size={20} />
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="invitation">
+        <div>
+          <div className="eyebrow">{t("featureLabel")}</div>
+          <h2>{t("featureTitle")}</h2>
+          <p>{t("noLegal")}</p>
+        </div>
+        <button className="button cream" onClick={onDemo}>
+          {t("demo")}
+          <ArrowRight size={18} />
+        </button>
+      </section>
+    </main>
+  );
+}
+function Demo({ onWork }: { onWork: () => void }) {
+  const { t, n, lang } = usePreferences();
+  const [sample, setSample] = useState(0),
+    [step, setStep] = useState(0),
+    [corrected, setCorrected] = useState(false);
+  const p = useMemo(() => {
+    const p = scenarios()[sample];
+    if (corrected) {
+      const r = reconcileMutation(p);
+      p.snapshots[0].holdings = Object.entries(r.expected).map(
+        ([party, share]) => ({ party, share }),
+      );
+    }
+    return p;
+  }, [sample, corrected]);
+  const result = reconcileMutation(p);
+  return (
+    <main className="demo-page">
+      <div className="page-heading">
+        <div className="eyebrow">{t("demoEyebrow")}</div>
+        <h1>{t("demoTitle")}</h1>
+        <p>{t("demoText")}</p>
+      </div>
+      <div className="demo-layout">
+        <aside className="demo-sidebar">
+          <label>
+            {t("scenario")}
+            <select
+              value={sample}
+              onChange={(e) => {
+                setSample(Number(e.target.value));
+                setStep(0);
+                setCorrected(false);
+              }}
+            >
+              <option value={0}>{t("scenario120")}</option>
+              <option value={10}>{t("scenario100")}</option>
+            </select>
+          </label>
+          <ol className="journey-steps">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <li key={i}>
+                <button
+                  className={
+                    step === i - 1 ? "current" : step > i - 1 ? "done" : ""
+                  }
+                  onClick={() => setStep(i - 1)}
+                >
+                  <span>{step > i - 1 ? <Check size={15} /> : n(i)}</span>
+                  {t(`step${i}`)}
+                </button>
+              </li>
+            ))}
+          </ol>
+          <div className="sidebar-tip">
+            <ShieldCheck size={22} />
+            <p>{t("noLegal")}</p>
+          </div>
+        </aside>
+        <section className="demo-content">
+          <div className="chapter-label">
+            {n(step + 1)} / {n(5)} <span>{p.id}</span>
+          </div>
+          <h2>{t(`step${step + 1}`)}</h2>
+          {step === 0 && (
+            <>
+              <p className="chapter-intro">
+                {n(p.area)} {t("decimal")} · {t("original")}
+              </p>
+              <Ownership state={result.baseline} parcel={p} />
+              <p className="source-note">
+                {t("source")}: {p.baselineDocument}
+              </p>
+            </>
+          )}
+          {step === 1 && (
+            <>
+              <p className="chapter-intro">{t("saleText")}</p>
+              <div className="transfer-card">
+                <div>
+                  <span>{partyName(p.parties.A, lang)}</span>
+                  <b>{n(area(p.events[0].allocations[0].share, p.area))}</b>
+                  <small>{t("decimal")}</small>
+                </div>
+                <ArrowRight size={34} />
+                <div>
+                  <span>{partyName(p.parties.D, lang)}</span>
+                  <b>{n(p.events[0].allocations[0].share)}</b>
+                  <small>{t("share")}</small>
+                </div>
+              </div>
+              <p className="source-note">
+                {p.events[0].id} · {p.events[0].documentId} ·{" "}
+                {n(p.events[0].effectiveDate)}
+              </p>
+              <h3>{t("expected")}</h3>
+              <Ownership state={result.expected} parcel={p} />
+            </>
+          )}
+          {step === 2 && (
+            <>
+              <p className="chapter-intro">{t("mutationText")}</p>
+              <Ownership state={result.observed} parcel={p} />
+              <p className="source-note">
+                {t("source")}: {p.snapshots[0].documentId}
+              </p>
+            </>
+          )}
+          {step >= 3 && (
+            <>
+              {step === 4 && (
+                <>
+                  <p className="chapter-intro">{t("correctText")}</p>
+                  <button
+                    className="button correction-button"
+                    onClick={() => setCorrected(!corrected)}
+                  >
+                    {t(corrected ? "restore" : "correct")}
+                    <RefreshCw size={16} />
+                  </button>
+                </>
+              )}
+              <ResultView result={result} />
+            </>
+          )}
+          <div className="journey-actions">
+            <button
+              className="button ghost"
+              disabled={step === 0}
+              onClick={() => setStep(step - 1)}
+            >
+              <ArrowLeft size={16} />
+              {t("back")}
+            </button>
+            {step < 4 ? (
+              <button className="button" onClick={() => setStep(step + 1)}>
+                {t("next")}
+                <ArrowRight size={16} />
+              </button>
+            ) : (
+              <button className="button" onClick={onWork}>
+                {t("workspace")}
+                <ArrowRight size={16} />
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+function Reviewer({ onUser }: { onUser: (user: User | null) => void }) {
+  const { t, n, lang } = usePreferences();
+  const [user, setUser] = useState<User | null>(null),
+    [checking, setChecking] = useState(true),
     [error, setError] = useState(""),
-    [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
-    [tab, setTab] = useState("Overview"),
-    [selected, setSelected] = useState("DEMO-P4-001"),
-    [query, setQuery] = useState(""),
-    [password, setPassword] = useState(""),
-    [login, setLogin] = useState(false),
-    [editing, setEditing] = useState(false),
-    [shares, setShares] = useState<Record<string, string>>({}),
-    [note, setNote] = useState(""),
-    [runId, setRunId] = useState(""),
-    [snapshotId, setSnapshotId] = useState("");
-  async function refresh() {
-    const r = await fetch("/api/workspace");
-    if (!r.ok) throw new Error("Could not load workspace");
-    setData(await r.json());
-  }
+    [data, setData] = useState<Data | null>(null),
+    [tab, setTab] = useState("parcels"),
+    [offset, setOffset] = useState(0),
+    [selected, setSelected] = useState(""),
+    [result, setResult] = useState<Run | null>(null),
+    [snapshot, setSnapshot] = useState(""),
+    [showEditor, setShowEditor] = useState(false),
+    [saved, setSaved] = useState(false);
   useEffect(() => {
-    let active = true;
-    fetch("/api/workspace")
-      .then((r) => {
-        if (!r.ok) throw new Error("Could not load workspace");
-        return r.json();
-      })
-      .then((body) => {
-        if (active) setData(body);
+    let live = true;
+    api<{ user: User | null }>("/api/session")
+      .then((d) => {
+        if (live) {
+          setUser(d.user);
+          onUser(d.user);
+          setChecking(false);
+        }
       })
       .catch((e) => {
-        if (active) setError(e.message);
+        if (live) {
+          setError(e.message);
+          setChecking(false);
+        }
       });
     return () => {
-      active = false;
+      live = false;
     };
-  }, []);
-  async function action(body: object) {
+  }, [onUser]);
+  const load = async (pid = selected, page = offset) => {
+    const d = await api<Data>(
+      `/api/workspace?offset=${page}${pid ? `&parcel=${encodeURIComponent(pid)}` : ""}`,
+    );
+    setData(d);
+    return d;
+  };
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    api<Data>(
+      `/api/workspace?offset=${offset}${selected ? `&parcel=${encodeURIComponent(selected)}` : ""}`,
+    )
+      .then((d) => {
+        if (live) {
+          setData(d);
+          setError("");
+        }
+      })
+      .catch((e) => {
+        if (live) setError(e.message);
+      });
+    return () => {
+      live = false;
+    };
+  }, [user, selected, offset]);
+  async function act(body: unknown) {
     setBusy(true);
     setError("");
-    setMessage("");
+    setSaved(false);
     try {
-      const r = await fetch("/api/workspace", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const result = await r.json();
-      if (!r.ok) throw new Error(result.error);
-      await refresh();
-      setMessage("Saved to the record and audit history.");
-      return result as { id?: string };
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function signIn(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    try {
-      const r = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      const body = await r.json();
-      if (!r.ok) throw new Error(body.error);
-      setPassword("");
-      setLogin(false);
-      setError("");
-      await refresh();
+      const answer = await api<{ id?: string }>("/api/workspace", body);
+      await load();
+      setSaved(true);
+      return answer;
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
-  const p = data?.parcels.find((p) => p.id === selected),
-    runs = data?.runs.filter((r) => r.parcel_id === selected) ?? [],
-    run = runs.find((r) => r.id === runId) ?? runs[0],
-    result = run?.result;
-  function select(id: string) {
-    setSelected(id);
-    setTab("Reconciliation");
-    setRunId("");
-    setSnapshotId("");
-    setEditing(false);
-    setMessage("");
-  }
-  async function execute() {
-    const r = await action({
-      action: "run",
-      parcelId: selected,
-      ...(snapshotId ? { snapshotId } : {}),
-    });
-    if (r?.id) {
-      setRunId(r.id);
-      setTab("Reconciliation");
+  async function getResult(id: string) {
+    setBusy(true);
+    try {
+      const d = await api<{ run: Run }>(`/api/workspace?run=${id}`);
+      setResult(d.run);
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
-  const buttons = [
-    "Overview",
-    "Parcel explorer",
-    "Reconciliation",
-    "Review queue",
-  ];
-  const icons = [LayoutDashboard, Layers3, GitBranch, ClipboardCheck];
+  const p = data?.parcel;
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <Link className="brand" href="/">
-          <span className="brand-icon">
-            <Layers3 size={26} />
-          </span>
-          <span>
-            BhuMi<small>RECORDS. RECONCILED.</small>
-          </span>
-        </Link>
-        <div className="workspace-label">REVIEWER WORKSPACE</div>
-        <nav>
-          {buttons.map((b, i) => {
-            const Icon = icons[i];
-            return (
-              <button
-                key={b}
-                className={tab === b ? "active" : ""}
-                onClick={() => setTab(b)}
-              >
-                <Icon size={19} />
-                {b}
-                {b === "Review queue" && (
-                  <span className="nav-count">
-                    {data?.reviews.filter((r) => r.status !== "RESOLVED")
-                      .length ?? 0}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-        <div className="side-bottom">
-          <div className="demo-label">
-            <span />
-            SYNTHETIC DATA ONLY
-          </div>
-          <p>
-            Built for clearer records.
-            <br />
-            Designed for human review.
-          </p>
-          <div className="profile">
-            <div className="avatar">{data?.reviewer ? "RO" : "PV"}</div>
-            <div>
-              <strong>
-                {data?.reviewer ? "Review officer" : "Public visitor"}
-              </strong>
-              <small>
-                {data?.reviewer
-                  ? "Simulated reviewer"
-                  : "Read-only demonstration"}
-              </small>
-            </div>
-          </div>
+    <main className="reviewer-page">
+      <div className="page-heading">
+        <div className="eyebrow">
+          <LockKeyhole size={13} />
+          {t("workspace")}
         </div>
-      </aside>
-      <div className="main-shell">
-        <header className="topbar">
-          <span>
-            <Menu size={17} /> Workspace <span className="slash">/</span>{" "}
-            <strong>{tab}</strong>
-          </span>
-          <div className="top-actions">
-            <span className="prototype">P4 · Prototype</span>
-            {data?.reviewer ? (
+        <h1>{user ? `${t("workspace")}` : t("loginTitle")}</h1>
+        <p>{t(user ? "recordText" : "loginText")}</p>
+      </div>
+      {error && (
+        <div className="notice error" role="alert">
+          <strong>{t("errorTitle")}</strong>
+          <p>{t(error)}</p>
+          <button
+            className="text-button"
+            onClick={() => {
+              setError("");
+              if (user) load().catch((e) => setError(e.message));
+              else {
+                setChecking(true);
+                api<{ user: User | null }>("/api/session")
+                  .then((d) => {
+                    setUser(d.user);
+                    onUser(d.user);
+                  })
+                  .catch((e) => setError(e.message))
+                  .finally(() => setChecking(false));
+              }
+            }}
+          >
+            <RefreshCw size={14} />
+            {t("retry")}
+          </button>
+        </div>
+      )}
+      {saved && (
+        <div role="status" className="notice success">
+          {t("saved")}
+        </div>
+      )}
+      {checking ? (
+        <Loading />
+      ) : !user ? (
+        <form
+          className="login-card"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            setBusy(true);
+            setError("");
+            try {
+              await api("/api/session", {
+                email: f.get("email"),
+                password: f.get("password"),
+              });
+              const d = await api<{ user: User }>("/api/session");
+              setUser(d.user);
+              onUser(d.user);
+            } catch (e) {
+              setError((e as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <div className="login-icon">
+            <LockKeyhole size={26} />
+          </div>
+          <h2>{t("signIn")}</h2>
+          <label>
+            {t("email")}
+            <input
+              type="email"
+              name="email"
+              required
+              maxLength={254}
+              autoComplete="username"
+            />
+          </label>
+          <label>
+            {t("password")}
+            <input
+              type="password"
+              name="password"
+              required
+              maxLength={128}
+              autoComplete="current-password"
+            />
+          </label>
+          <button className="button" disabled={busy}>
+            {t("loginSubmit")}
+            <ArrowRight size={17} />
+          </button>
+          <p>{t("loginHelp")}</p>
+          <small>{t("loginLocal")}</small>
+        </form>
+      ) : (
+        <>
+          <div className="workspace-tabs">
+            {[
+              "parcels",
+              "reviews",
+              "audit",
+              "profile",
+              ...(user.role === "ADMIN" ? ["accounts"] : []),
+            ].map((key) => (
               <button
-                className="text-button"
-                onClick={async () => {
-                  await fetch("/api/session", { method: "DELETE" });
-                  await refresh();
+                key={key}
+                className={tab === key ? "active" : ""}
+                onClick={() => {
+                  setTab(key);
+                  setSelected("");
+                  setResult(null);
+                  setOffset(0);
+                  setSaved(false);
                 }}
               >
-                <LogOut size={16} /> Sign out
+                {t(key)}
               </button>
-            ) : (
-              <button className="text-button" onClick={() => setLogin(!login)}>
-                Reviewer sign in <ArrowUpRight size={16} />
-              </button>
-            )}
+            ))}
+            <button
+              className="logout"
+              onClick={async () => {
+                try {
+                  await api("/api/session", undefined, "DELETE");
+                  setUser(null);
+                  onUser(null);
+                  setData(null);
+                  setResult(null);
+                } catch (e) {
+                  setError((e as Error).message);
+                }
+              }}
+            >
+              <LogOut size={15} />
+              {t("signOut")}
+            </button>
           </div>
-        </header>
-        <main>
-          <div className="eyebrow">
-            <span /> LAND OWNERSHIP RECONCILIATION
-          </div>
-          <div className="heading-row">
-            <div>
-              <h1>
-                {tab === "Overview"
-                  ? "Ownership Reconciliation Dashboard"
-                  : tab === "Parcel explorer"
-                    ? "Every parcel has a story."
-                    : tab === "Review queue"
-                      ? "A clear path to resolution."
-                      : "Follow the share. Find the difference."}
-              </h1>
-              <p className="subtitle">
-                {tab === "Overview"
-                  ? "A consistent record starts with checking who owns what."
-                  : tab === "Review queue"
-                    ? "Review the evidence. Record the decision. Preserve the history."
-                    : "Reconstruct documented interests, then compare the mutation owner by owner."}
-              </p>
-            </div>
-            <span className="synthetic-tag">
-              <ShieldCheck size={16} /> Fictional records
-            </span>
-          </div>
-          {error && (
-            <div role="alert" className="notice error">
-              {error}
-            </div>
-          )}
-          {message && (
-            <div role="status" className="notice">
-              {message}
-            </div>
-          )}
-          {login && (
-            <form className="panel login-form" onSubmit={signIn}>
-              <div>
-                <h3>Simulated reviewer access</h3>
-                <p>
-                  {data?.authConfigured
-                    ? "Enter the password configured by your demo administrator."
-                    : "Reviewer access is not configured. Follow the README local setup instructions."}
-                </p>
-              </div>
-              <label>
-                Password
-                <input
-                  aria-label="Reviewer password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </label>
-              <button className="primary" disabled={busy}>
-                Sign in
-              </button>
-            </form>
-          )}
           {!data ? (
-            <div className="panel">Loading the record workspace…</div>
-          ) : (
+            <Loading />
+          ) : tab === "parcels" ? (
             <>
-              {tab === "Overview" && (
+              {!selected ? (
                 <>
-                  <div className="stats">
-                    {[
-                      [
-                        data.parcels.length,
-                        "Fictional parcels",
-                        "Structured demo records",
-                      ],
-                      [
-                        data.runs.length,
-                        "Reconciliation runs",
-                        "Saved, reproducible results",
-                      ],
-                      [
-                        data.runs.filter((r) => r.result.status === "CONFLICT")
-                          .length,
-                        "Runs with discrepancies",
-                        "Owner-level differences",
-                      ],
-                      [
-                        data.reviews.filter((r) => r.status !== "RESOLVED")
-                          .length,
-                        "Open review cases",
-                        "Awaiting a human decision",
-                      ],
-                    ].map(([number, title, sub]) => (
-                      <div className="stat" key={title}>
-                        <span>{title}</span>
-                        <strong>
-                          {number}
-                          <span className="stat-icon">
-                            <ArrowUpRight size={20} />
-                          </span>
-                        </strong>
-                        <small>{sub}</small>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="feature">
-                    <div>
-                      <div className="feature-kicker">
-                        THE SIGNATURE SCENARIO <span>DEMO-P4-001</span>
-                      </div>
-                      <h2>
-                        The total is right.
-                        <br />
-                        The ownership isn’t.
-                      </h2>
-                      <p>
-                        A registered sale transfers 30 decimals equivalent.
-                        <br />
-                        The mutation quietly takes 15 from an uninvolved
-                        co-owner.
-                      </p>
+                  <div className="record-grid">
+                    {data.parcels.map((parcel) => (
                       <button
-                        className="light-button"
-                        onClick={() => select("DEMO-P4-001")}
-                      >
-                        Explore the discrepancy <ArrowRight size={17} />
-                      </button>
-                    </div>
-                    <div className="feature-visual">
-                      <div className="visual-title">
-                        SAME TOTAL. DIFFERENT OWNERS.
-                      </div>
-                      <div className="mini-row">
-                        <span>Expected</span>
-                        <strong>
-                          120 <small>decimals</small>
-                        </strong>
-                      </div>
-                      <ShareBar
-                        state={{ A: "1/4", B: "1/3", C: "1/6", D: "1/4" }}
-                        parties={{}}
-                      />
-                      <div className="mini-row">
-                        <span>Mutation</span>
-                        <strong>
-                          120 <small>decimals</small>
-                        </strong>
-                      </div>
-                      <ShareBar
-                        state={{ A: "1/4", B: "5/24", C: "1/6", D: "3/8" }}
-                        parties={{}}
-                      />
-                      <div className="visual-note">
-                        <AlertTriangle size={17} /> Owner B −15 <span>→</span>{" "}
-                        Buyer D +15
-                      </div>
-                      <small>
-                        Illustrative seeded input · run the engine to verify
-                      </small>
-                    </div>
-                  </div>
-                  <div className="section-title">
-                    <div>
-                      <h2>Explore the supplied records</h2>
-                      <p>
-                        Eleven scenarios. Exact calculations. Traceable
-                        evidence.
-                      </p>
-                    </div>
-                    <button
-                      className="text-button"
-                      onClick={() => setTab("Parcel explorer")}
-                    >
-                      View all parcels <ArrowRight size={16} />
-                    </button>
-                  </div>
-                  <div className="scenario-grid">
-                    {data.parcels.slice(0, 3).map((parcel, i) => (
-                      <button
-                        className="scenario-card"
+                        className="record-card"
                         key={parcel.id}
-                        onClick={() => select(parcel.id)}
+                        onClick={() => {
+                          setSelected(parcel.id);
+                          setOffset(0);
+                          setSnapshot("");
+                          setResult(null);
+                          setShowEditor(false);
+                        }}
                       >
-                        <span className="scenario-number">
-                          0{i + 1}
-                          <ArrowUpRight size={20} />
+                        <span className="record-icon">
+                          <Layers3 size={23} />
+                          <ArrowUpRight size={19} />
                         </span>
                         <small>{parcel.id}</small>
-                        <h3>{parcel.title}</h3>
+                        <h3>{parcelTitle(parcel.id, parcel.title, lang)}</h3>
                         <p>
-                          {parcel.area} decimals · {parcel.events.length}{" "}
-                          documented event
+                          {n(parcel.area)} {t("decimal")}
                         </p>
-                        <span className="card-link">
-                          Open parcel <ArrowRight size={15} />
+                        <span className="record-link">
+                          {t("open")}
+                          <ArrowRight size={16} />
                         </span>
                       </button>
                     ))}
                   </div>
-                  <div className="section-title">
-                    <h2>Recent documented events</h2>
-                    <span className="muted">Synthetic source records</span>
-                  </div>
-                  <div className="panel table-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Source event</th>
-                          <th>Parcel</th>
-                          <th>Transaction</th>
-                          <th>Effective date</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.parcels.slice(0, 4).map((parcel) => (
-                          <tr key={parcel.id}>
-                            <td>
-                              <strong>{parcel.events[0].id}</strong>
-                            </td>
-                            <td>
-                              <button
-                                className="link"
-                                onClick={() => select(parcel.id)}
-                              >
-                                {parcel.id}
-                              </button>
-                            </td>
-                            <td>{label(parcel.events[0].type)}</td>
-                            <td>{parcel.events[0].effectiveDate}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  {!data.parcels.length && <Empty text={t("noParcels")} />}
+                  <Pagination
+                    offset={offset}
+                    size={6}
+                    next={offset + 6 < data.total}
+                    onChange={setOffset}
+                  />
                 </>
-              )}
-              {tab === "Parcel explorer" && (
+              ) : !p || p.id !== selected ? (
+                <Loading />
+              ) : (
                 <>
-                  <label className="search">
-                    <Search size={18} />
-                    <input
-                      placeholder="Search parcel reference, title, mouza…"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                    />
-                  </label>
-                  <div className="scenario-grid">
-                    {data.parcels
-                      .filter((p) =>
-                        `${p.id} ${p.title} ${p.mouza}`
-                          .toLowerCase()
-                          .includes(query.toLowerCase()),
-                      )
-                      .map((parcel) => (
-                        <button
-                          className="scenario-card"
-                          key={parcel.id}
-                          onClick={() => select(parcel.id)}
-                        >
-                          <span className="scenario-number">
-                            <Landmark size={23} />
-                            <ArrowUpRight size={20} />
-                          </span>
-                          <small>{parcel.id}</small>
-                          <h3>{parcel.title}</h3>
-                          <p>
-                            {parcel.area} decimals · {parcel.survey}
-                          </p>
-                          <span className="card-link">
-                            Inspect the record <ArrowRight size={15} />
-                          </span>
-                        </button>
-                      ))}
-                  </div>
-                </>
-              )}
-              {tab === "Reconciliation" && p && (
-                <>
-                  <div className="toolbar">
-                    <label>
-                      Selected parcel
-                      <select
-                        value={selected}
-                        onChange={(e) => select(e.target.value)}
-                      >
-                        {data.parcels.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.id} · {p.title}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button
-                      className="primary"
-                      onClick={execute}
-                      disabled={busy || !data.reviewer}
-                    >
-                      <Play size={16} /> Run reconciliation
-                    </button>
-                  </div>
-                  {!data.reviewer && (
-                    <p className="muted">
-                      Public demonstration is read-only. Sign in as a simulated
-                      reviewer to run calculations or record decisions.
-                    </p>
-                  )}
-                  <div className="parcel-meta panel">
+                  <button
+                    className="text-button back-link"
+                    onClick={() => {
+                      setSelected("");
+                      setResult(null);
+                      setOffset(0);
+                    }}
+                  >
+                    <ArrowLeft size={16} />
+                    {t("parcels")}
+                  </button>
+                  <div className="parcel-title">
                     <div>
-                      <small>PARCEL</small>
-                      <h3>{p.id}</h3>
-                      <p>{p.title}</p>
+                      <small>{p.id}</small>
+                      <h2>{parcelTitle(p.id, p.title, lang)}</h2>
                     </div>
-                    <div>
-                      <small>RECORDED AREA</small>
-                      <h3>
-                        {p.area} <span>decimals</span>
-                      </h3>
-                      <p>Undivided interest equivalents</p>
-                    </div>
-                    <div>
-                      <small>SOURCE GEOGRAPHY</small>
-                      <h3>{p.mouza}</h3>
-                      <p>
-                        {p.khatian} / {p.dag} · {p.survey}
-                      </p>
-                    </div>
+                    <span>
+                      {n(p.area)} {t("decimal")}
+                    </span>
                   </div>
-                  <div className="two-col">
-                    <section className="panel padded">
-                      <div className="panel-heading">
-                        <h3>
-                          01 <span>Starting ownership</span>
-                        </h3>
-                        <Badge value="SUPPLIED" />
-                      </div>
-                      <ShareBar
+                  <div className="two-panels">
+                    <section className="panel">
+                      <h3>{t("original")}</h3>
+                      <Ownership
                         state={Object.fromEntries(
                           p.baseline.map((h) => [h.party, h.share]),
                         )}
-                        parties={p.parties}
+                        parcel={p}
                       />
-                      {p.baseline.map((h) => (
-                        <div className="holding" key={h.party}>
-                          <span>{p.parties[h.party]}</span>
-                          <strong>
-                            {h.share}{" "}
-                            <small>· {area(h.share, p.area)} decimals</small>
-                          </strong>
-                        </div>
-                      ))}
-                      <p className="muted">
-                        {p.baselineDate} · Source: {p.baselineDocument}
-                      </p>
                     </section>
-                    <section className="panel padded">
-                      <div className="panel-heading">
-                        <h3>
-                          02 <span>Documented events</span>
-                        </h3>
-                        <GitBranch size={18} />
-                      </div>
+                    <section className="panel">
+                      <h3>{t("events")}</h3>
                       {p.events.map((e) => (
-                        <details className="event" key={e.id}>
+                        <details className="event-details" key={e.id}>
                           <summary>
-                            <span className="event-dot" />
-                            <strong>
-                              {label(e.type)} · {e.id}
-                            </strong>
-                            <small>{e.effectiveDate}</small>
+                            <GitBranch size={16} />
+                            {t(e.type)} <small>{e.id}</small>
                           </summary>
-                          <p>{e.notes}</p>
+                          <p>
+                            {n(e.effectiveDate)} · {e.documentId}
+                          </p>
                           {e.allocations.map((a, i) => (
                             <p key={i}>
-                              {p.parties[a.from]} → {p.parties[a.to]}:{" "}
-                              <strong>{a.share}</strong> (
-                              {area(a.share, p.area)} decimals equivalent)
+                              {partyName(p.parties[a.from], lang)} →{" "}
+                              {partyName(p.parties[a.to], lang)}{" "}
+                              <b>{n(a.share)}</b> ({n(area(a.share, p.area))}{" "}
+                              {t("decimal")})
                             </p>
                           ))}
-                          <p>
-                            Source:{" "}
-                            <a href={`#doc-${e.documentId}`}>{e.documentId}</a>{" "}
-                            · Entered: {e.recordedAt}
-                          </p>
-                          {result?.timeline.find(
-                            (t) => t.event.id === e.id,
-                          ) && (
-                            <div className="before-after">
-                              <pre>
-                                Before:{" "}
-                                {JSON.stringify(
-                                  result.timeline.find(
-                                    (t) => t.event.id === e.id,
-                                  )?.before,
-                                  null,
-                                  2,
-                                )}
-                              </pre>
-                              <pre>
-                                After:{" "}
-                                {JSON.stringify(
-                                  result.timeline.find(
-                                    (t) => t.event.id === e.id,
-                                  )?.after,
-                                  null,
-                                  2,
-                                )}
-                              </pre>
-                            </div>
-                          )}
                         </details>
                       ))}
                     </section>
                   </div>
-                  <div className="panel padded snapshot-picker">
+                  <div className="panel control-panel">
                     <label>
-                      Mutation snapshot
+                      {t("snapshots")}
                       <select
-                        value={snapshotId || p.snapshots.at(-1)?.id || ""}
-                        onChange={(e) => setSnapshotId(e.target.value)}
+                        value={snapshot || p.snapshots.at(-1)?.id || ""}
+                        onChange={(e) => setSnapshot(e.target.value)}
                       >
                         {!p.snapshots.length && (
-                          <option value="">No mutation supplied</option>
+                          <option value="">
+                            {t("EXPECTED_MUTATION_MISSING")}
+                          </option>
                         )}
                         {p.snapshots.map((s) => (
                           <option key={s.id} value={s.id}>
-                            {s.reference} · {s.effectiveDate}
+                            {s.reference} · {n(s.effectiveDate)}
                           </option>
                         ))}
                       </select>
                     </label>
                     <button
-                      className="secondary"
-                      disabled={!data.reviewer}
-                      onClick={() => {
-                        setEditing(!editing);
-                        setShares(
-                          Object.fromEntries(
-                            (p.snapshots.at(-1)?.holdings ?? p.baseline).map(
-                              (h) => [h.party, h.share],
-                            ),
-                          ),
-                        );
-                        setNote("");
+                      className="button"
+                      disabled={busy}
+                      onClick={async () => {
+                        const d = await act({
+                          action: "run",
+                          parcelId: p.id,
+                          ...(snapshot ? { snapshotId: snapshot } : {}),
+                        });
+                        if (d?.id) await getResult(d.id);
                       }}
                     >
-                      <Plus size={16} /> Append revised snapshot
+                      {t("run")}
+                      <Scale size={17} />
+                    </button>
+                    <button
+                      className="button ghost"
+                      onClick={() => setShowEditor(!showEditor)}
+                    >
+                      <Plus size={16} />
+                      {t("newSnapshot")}
                     </button>
                   </div>
-                  {p.snapshots.length > 0 &&
-                    (() => {
-                      const snapshot =
-                        p.snapshots.find((s) => s.id === snapshotId) ??
-                        p.snapshots.at(-1)!;
-                      return (
-                        <details
-                          className="panel padded"
-                          style={{ marginBottom: 20 }}
-                        >
-                          <summary>
-                            Inspect supplied mutation · {snapshot.reference}
-                          </summary>
-                          <p>
-                            Source: {snapshot.documentId} · Effective:{" "}
-                            {snapshot.effectiveDate} · Events:{" "}
-                            {snapshot.eventIds.join(", ")}
-                          </p>
-                          <div className="table-wrap">
-                            <table>
-                              <thead>
-                                <tr>
-                                  <th>Party</th>
-                                  <th>Recorded share</th>
-                                  <th>Decimals equivalent</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {snapshot.holdings.map((h) => (
-                                  <tr key={h.party}>
-                                    <td>{p.parties[h.party]}</td>
-                                    <td>{h.share}</td>
-                                    <td>{area(h.share, p.area)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </details>
-                      );
-                    })()}
-                  {editing && (
-                    <form
-                      className="panel padded"
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        const r = await action({
-                          action: "snapshot",
-                          parcelId: p.id,
-                          holdings: Object.entries(shares).map(
-                            ([party, share]) => ({ party, share }),
-                          ),
-                          note,
-                        });
-                        if (r?.id) {
-                          setSnapshotId(r.id);
-                          setEditing(false);
+                  {showEditor && (
+                    <SnapshotEditor
+                      parcel={p}
+                      busy={busy}
+                      onCancel={() => setShowEditor(false)}
+                      onSave={async (body) => {
+                        const d = await act(body);
+                        if (d?.id) {
+                          setSnapshot(d.id);
+                          setShowEditor(false);
                         }
                       }}
-                    >
-                      <h3>Record a new synthetic mutation snapshot</h3>
-                      <p>
-                        Enter fractions of the whole parcel. Earlier snapshots
-                        and findings remain unchanged.
-                      </p>
-                      <div className="form-grid">
-                        {Object.entries(p.parties).map(([id, name]) => (
-                          <label key={id}>
-                            {name}
-                            <input
-                              aria-label={`${name} share`}
-                              value={shares[id] ?? "0"}
-                              onChange={(e) =>
-                                setShares({ ...shares, [id]: e.target.value })
-                              }
+                    />
+                  )}
+                  <div className="panel history-panel">
+                    <h3>{t("history")}</h3>
+                    {data.runs.length ? (
+                      <div className="run-buttons">
+                        {data.runs.map((r) => (
+                          <button
+                            key={r.id}
+                            className={result?.id === r.id ? "current" : ""}
+                            onClick={() => getResult(r.id)}
+                          >
+                            <span>
+                              {new Date(r.created_at).toLocaleString(
+                                lang === "bn" ? "bn-BD" : "en-GB",
+                              )}
+                            </span>
+                            <Badge value={r.status} />
+                            <small>{r.id.slice(0, 8)}</small>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p>{t("noRuns")}</p>
+                    )}
+                    <Pagination
+                      offset={offset}
+                      size={10}
+                      next={data.runs.length === 10}
+                      onChange={setOffset}
+                    />
+                  </div>
+                  {result && (
+                    <>
+                      <ResultView result={result.result} />
+                      <div className="report-actions">
+                        <Link
+                          className="button ghost"
+                          target="_blank"
+                          href={`/report/${result.id}`}
+                        >
+                          <Printer size={16} />
+                          {t("report")}
+                        </Link>
+                      </div>
+                      {result.result.findings.length > 0 && (
+                        <form
+                          className="panel case-form"
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            const f = new FormData(e.currentTarget);
+                            await act({
+                              action: "createReview",
+                              runId: result.id,
+                              note: f.get("note"),
+                            });
+                          }}
+                        >
+                          <label>
+                            {t("caseNote")}
+                            <textarea
+                              name="note"
+                              minLength={5}
+                              maxLength={2000}
                               required
                             />
                           </label>
-                        ))}
-                      </div>
-                      <label>
-                        Evidence / reason
-                        <textarea
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          minLength={5}
-                          required
-                        />
-                      </label>
-                      <button className="primary" disabled={busy}>
-                        Save new snapshot
-                      </button>
-                    </form>
-                  )}
-                  {runs.length > 0 && (
-                    <label className="run-picker">
-                      Historical run
-                      <select
-                        value={run?.id ?? ""}
-                        onChange={(e) => setRunId(e.target.value)}
-                      >
-                        {runs.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {new Date(r.created_at).toLocaleString()} ·{" "}
-                            {r.result.status} · {r.id.slice(0, 8)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  {result && run ? (
-                    <>
-                      <ResultView result={result} />
-                      <div className="report-actions">
-                        <a
-                          className="secondary"
-                          href={`/report/${run.id}`}
-                          target="_blank"
-                        >
-                          <FileText size={16} /> Printable evidence report
-                        </a>
-                        <button
-                          className="primary"
-                          disabled={
-                            busy ||
-                            !data.reviewer ||
-                            !result.findings.length ||
-                            data.reviews.some((r) => r.run_id === run.id)
-                          }
-                          onClick={() =>
-                            action({
-                              action: "createReview",
-                              runId: run.id,
-                              note: "Review the source-linked ownership discrepancies.",
-                            })
-                          }
-                        >
-                          <ClipboardCheck size={17} />
-                          {data.reviews.some((r) => r.run_id === run.id)
-                            ? "Review case created"
-                            : "Create review case"}
-                        </button>
-                      </div>
+                          <button className="button" disabled={busy}>
+                            {t("createCase")}
+                          </button>
+                        </form>
+                      )}
                     </>
-                  ) : (
-                    <div className="empty panel">
-                      <GitBranch size={32} />
-                      <h3>Ready to compare the records</h3>
-                      <p>
-                        Run reconciliation to calculate expected interests and
-                        inspect exact differences.
-                      </p>
-                    </div>
                   )}
-                  <div className="section-title">
-                    <h2>Source evidence</h2>
-                    <span className="muted">
-                      Supplied does not mean legally verified
-                    </span>
-                  </div>
-                  <div className="scenario-grid">
-                    {p.documents.map((doc) => (
-                      <section
-                        className="panel padded"
-                        key={doc.id}
-                        id={`doc-${doc.id}`}
-                      >
-                        <FileText size={20} />
-                        <h3>{doc.reference}</h3>
-                        <Badge value={doc.status} />
-                        <p>{doc.notes}</p>
+                  <section className="panel source-panel">
+                    <h3>{t("evidence")}</h3>
+                    {p.documents.map((d) => (
+                      <details key={d.id}>
+                        <summary>
+                          <FileText size={16} />
+                          {d.reference}
+                          <Badge value={d.status} />
+                        </summary>
+                        <p>{d.notes}</p>
                         <small>
-                          {doc.date} · {doc.type}
+                          {n(d.date)} · {d.id}
                         </small>
-                      </section>
+                      </details>
                     ))}
-                  </div>
-                </>
-              )}
-              {tab === "Review queue" && (
-                <>
-                  {data.reviews.length === 0 ? (
-                    <div className="empty panel">
-                      <ClipboardCheck size={32} />
-                      <h3>No review cases yet</h3>
-                      <p>
-                        Run reconciliation on a parcel, then create a review
-                        case from its findings.
-                      </p>
-                      <button
-                        className="primary"
-                        onClick={() => select("DEMO-P4-001")}
-                      >
-                        Open signature scenario <ArrowRight size={16} />
-                      </button>
-                    </div>
-                  ) : (
-                    data.reviews.map((review) => (
-                      <ReviewCard
-                        key={review.id}
-                        review={review}
-                        run={data.runs.find((r) => r.id === review.run_id)!}
-                        enabled={data.reviewer && !busy}
-                        onSave={(status, note) =>
-                          action({
-                            action: "review",
-                            id: review.id,
-                            status,
-                            note,
-                          })
-                        }
-                        onOpen={() =>
-                          select(
-                            data.runs.find((r) => r.id === review.run_id)!
-                              .parcel_id,
-                          )
-                        }
-                      />
-                    ))
-                  )}
-                  <div className="section-title">
-                    <h2>Audit trail</h2>
-                    <span className="muted">
-                      Original findings remain in run history
-                    </span>
-                  </div>
-                  <div className="panel table-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Action</th>
-                          <th>Actor</th>
-                          <th>Reason</th>
-                          <th>Recorded</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.audit.map((a) => (
-                          <tr key={a.id}>
-                            <td>{label(a.action)}</td>
-                            <td>{a.actor}</td>
-                            <td>{a.reason}</td>
-                            <td>{new Date(a.created_at).toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {!data.audit.length && (
-                      <p className="padded muted">No actions recorded yet.</p>
-                    )}
-                  </div>
+                  </section>
                 </>
               )}
             </>
+          ) : tab === "reviews" ? (
+            <>
+              {!data.reviews.length && <Empty text={t("noCases")} />}
+              {data.reviews.map((review) => (
+                <ReviewCard
+                  key={`${review.id}-${review.version}`}
+                  review={review}
+                  busy={busy}
+                  onSave={(status, note) =>
+                    act({
+                      action: "review",
+                      id: review.id,
+                      status,
+                      note,
+                      version: review.version,
+                    })
+                  }
+                />
+              ))}
+              <Pagination
+                offset={offset}
+                size={10}
+                next={data.reviews.length === 10}
+                onChange={setOffset}
+              />
+            </>
+          ) : tab === "audit" ? (
+            <section className="panel">
+              <h2>{t("audit")}</h2>
+              {data.audit.map((a) => (
+                <article className="audit-item" key={a.id}>
+                  <span className="audit-dot" />
+                  <div>
+                    <h3>{t(a.action)}</h3>
+                    <p>{a.reason}</p>
+                    <small>
+                      {a.actor} ·{" "}
+                      {new Date(a.created_at).toLocaleString(
+                        lang === "bn" ? "bn-BD" : "en-GB",
+                      )}
+                    </small>
+                  </div>
+                </article>
+              ))}
+              {!data.audit.length && <p>{t("noAudit")}</p>}
+              <Pagination
+                offset={offset}
+                size={10}
+                next={data.audit.length === 10}
+                onChange={setOffset}
+              />
+            </section>
+          ) : tab === "profile" ? (
+            <PasswordForm
+              onError={setError}
+              onChanged={() => {
+                setUser(null);
+                onUser(null);
+                setData(null);
+                setResult(null);
+                setTab("parcels");
+              }}
+            />
+          ) : (
+            <Accounts onError={setError} />
           )}
-          <footer>
-            <span>
-              <Layers3 size={15} /> BhuMi · LandTech 2026
-            </span>
-            <p>
-              Synthetic demonstration · Recorded interests are not legal title
-              or surveyed boundaries. Consult an authorized land office.
-            </p>
-          </footer>
-        </main>
-      </div>
+        </>
+      )}
+    </main>
+  );
+}
+function Loading() {
+  const { t } = usePreferences();
+  return (
+    <div className="loading-state" role="status">
+      <RefreshCw size={25} />
+      <h3>{t("loading")}</h3>
+      <p>{t("coldStart")}</p>
     </div>
   );
 }
-export function ResultView({ result: r }: { result: Result }) {
-  const p = r.input;
+function Empty({ text }: { text: string }) {
   return (
-    <section className="panel results">
-      <div className="result-header">
-        <div>
-          <div className="eyebrow">03 / RECONCILIATION RESULT</div>
-          <h2>
-            {r.status === "MATCH"
-              ? "The supplied ownership records reconcile."
-              : r.status === "CONFLICT"
-                ? "The records tell different ownership stories."
-                : "More evidence or interpretation is needed."}
-          </h2>
-          <p>
-            Evidence: {label(r.evidenceStatus)} · Rules {r.rulesVersion}
-            <br />
-            Snapshot:{" "}
-            {r.input.snapshots.find((s) => s.id === r.snapshotId)?.reference ??
-              "None supplied"}
-          </p>
-        </div>
-        <Badge value={r.status} />
+    <div className="empty-state">
+      <FileText size={30} />
+      <p>{text}</p>
+    </div>
+  );
+}
+function Pagination({
+  offset,
+  size,
+  next,
+  onChange,
+}: {
+  offset: number;
+  size: number;
+  next: boolean;
+  onChange: (n: number) => void;
+}) {
+  const { t, n } = usePreferences();
+  return (
+    <div className="pagination">
+      <button
+        className="button ghost small"
+        disabled={!offset}
+        onClick={() => onChange(Math.max(0, offset - size))}
+      >
+        {t("previous")}
+      </button>
+      <span>
+        {t("page")} {n(Math.floor(offset / size) + 1)}
+      </span>
+      <button
+        className="button ghost small"
+        disabled={!next}
+        onClick={() => onChange(offset + size)}
+      >
+        {t("more")}
+      </button>
+    </div>
+  );
+}
+function SnapshotEditor({
+  parcel: p,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  parcel: Parcel;
+  busy: boolean;
+  onSave: (body: unknown) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const { t, lang } = usePreferences();
+  return (
+    <form
+      className="panel snapshot-editor"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        await onSave({
+          action: "snapshot",
+          parcelId: p.id,
+          holdings: Object.keys(p.parties).map((party) => ({
+            party,
+            share: asciiDigits(String(f.get(party))).trim(),
+          })),
+          note: f.get("note"),
+          effectiveDate: f.get("date"),
+          previousSnapshotId: p.snapshots.at(-1)?.id ?? null,
+        });
+      }}
+    >
+      <h2>{t("newSnapshot")}</h2>
+      <p>{t("newSnapshotText")}</p>
+      <div className="form-grid">
+        {Object.entries(p.parties).map(([id, name]) => (
+          <label key={id}>
+            {partyName(name, lang)}
+            <input
+              name={id}
+              aria-label={`${partyName(name, lang)} ${t("share")}`}
+              defaultValue={
+                p.snapshots.at(-1)?.holdings.find((h) => h.party === id)
+                  ?.share ?? "0"
+              }
+              maxLength={82}
+              required
+            />
+          </label>
+        ))}
       </div>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Recorded party</th>
-              <th>Expected share</th>
-              <th>Mutation share</th>
-              <th>Expected area*</th>
-              <th>Mutation area*</th>
-              <th>Difference*</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from(
-              new Set([...Object.keys(r.expected), ...Object.keys(r.observed)]),
-            ).map((party) => {
-              const ex = r.expected[party] ?? "0",
-                actual = r.observed[party] ?? "0",
-                diff = fraction(actual).sub(fraction(ex)).toString();
-              return (
-                <tr className={diff === "0" ? "" : "different"} key={party}>
-                  <td>
-                    <strong>{p.parties[party] ?? party}</strong>
-                  </td>
-                  <td>{ex}</td>
-                  <td>{actual}</td>
-                  <td>{area(ex, p.area)}</td>
-                  <td>{area(actual, p.area)}</td>
-                  <td>
-                    {diff === "0" ? (
-                      <span className="match">
-                        <Check size={14} /> Match
-                      </span>
-                    ) : (
-                      <strong className="difference">
-                        {fraction(diff).n > 0n ? "+" : ""}
-                        {area(diff, p.area)}
-                      </strong>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-            <tr className="total">
-              <td>Total</td>
-              <td>{r.expectedTotal}</td>
-              <td>{r.observedTotal}</td>
-              <td>{area(r.expectedTotal, p.area)}</td>
-              <td>{area(r.observedTotal, p.area)}</td>
-              <td>
-                {r.expectedTotal === r.observedTotal
-                  ? "Totals balance"
-                  : "Totals differ"}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <small>{t("fractionHint")}</small>
+      <label>
+        {t("date")}
+        <input
+          name="date"
+          type="date"
+          defaultValue="2026-04-01"
+          min={p.events.reduce(
+            (a, e) => (e.effectiveDate > a ? e.effectiveDate : a),
+            p.baselineDate,
+          )}
+          required
+        />
+      </label>
+      <label>
+        {t("reason")}
+        <textarea name="note" minLength={5} maxLength={2000} required />
+      </label>
+      <div className="button-row">
+        <button className="button" disabled={busy}>
+          {t("saveSnapshot")}
+        </button>
+        <button type="button" className="button ghost" onClick={onCancel}>
+          {t("cancel")}
+        </button>
       </div>
-      <p className="table-note">
-        * Decimals equivalent of undivided interests, not physical boundaries.{" "}
-        {r.status === "INSUFFICIENT_EVIDENCE" || r.status === "REVIEW_REQUIRED"
-          ? "Replay may be partial; do not interpret this table as a final expected allocation."
-          : "Equal totals alone do not establish correct ownership allocation."}
-      </p>
-      {r.findings.map((f, i) => (
-        <div className="finding" key={i}>
-          <AlertTriangle size={20} />
-          <div>
-            <h3>{f.code}</h3>
-            <p>
-              {f.party && f.difference
-                ? `${p.parties[f.party]} has ${area(f.actual ?? "0", p.area)} decimals equivalent in mutation; the documented history supports ${area(f.expected ?? "0", p.area)}. Exact difference: ${area(f.difference, p.area)} decimals equivalent.`
-                : f.explanation}
-            </p>
-            <small>
-              Events: {f.eventIds.join(", ") || "Baseline"} · Sources:{" "}
-              {f.documentIds.join(", ")}
-            </small>
-            <p className="recommendation">Review step: {f.recommendation}</p>
-          </div>
-        </div>
-      ))}
-    </section>
+    </form>
   );
 }
 function ReviewCard({
   review,
-  run,
-  enabled,
+  busy,
   onSave,
-  onOpen,
 }: {
-  review: Review;
-  run: Run;
-  enabled: boolean;
+  review: Review & { parcel_id: string };
+  busy: boolean;
   onSave: (status: string, note: string) => Promise<unknown>;
-  onOpen: () => void;
 }) {
+  const { t, n } = usePreferences();
   const transitions: Record<string, string[]> = {
     NEW: ["UNDER_REVIEW"],
     UNDER_REVIEW: ["NEEDS_EVIDENCE", "RESOLVED", "ESCALATED"],
@@ -1109,72 +1157,251 @@ function ReviewCard({
     RESOLVED: ["UNDER_REVIEW"],
     ESCALATED: ["UNDER_REVIEW"],
   };
-  const [status, setStatus] = useState(transitions[review.status][0]),
-    [note, setNote] = useState("");
   return (
-    <section className="panel padded review-card">
-      <div className="panel-heading">
+    <section className="panel review-card">
+      <div className="review-title">
         <div>
-          <button className="link" onClick={onOpen}>
-            {run.parcel_id}
-          </button>
-          <h3>{run.result.findings.length} source-linked findings</h3>
+          <small>
+            {review.parcel_id} · {t("version")} {n(review.version)}
+          </small>
+          <h3>{t("createCase")}</h3>
         </div>
         <Badge value={review.status} />
       </div>
       <p>{review.note}</p>
-      <details>
-        <summary>Inspect original findings</summary>
-        {run.result.findings.map((f, i) => (
-          <p key={i}>
-            <strong>{f.code}</strong> — {f.explanation}
-          </p>
-        ))}
-      </details>
+      <Link
+        className="text-button"
+        href={`/report/${review.run_id}`}
+        target="_blank"
+      >
+        {t("report")}
+        <ArrowUpRight size={15} />
+      </Link>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          await onSave(
-            transitions[review.status].includes(status)
-              ? status
-              : transitions[review.status][0],
-            note,
-          );
-          setNote("");
+          const f = new FormData(e.currentTarget);
+          await onSave(String(f.get("status")), String(f.get("note")));
         }}
       >
         <label>
-          Next action
-          <select
-            value={
-              transitions[review.status].includes(status)
-                ? status
-                : transitions[review.status][0]
-            }
-            onChange={(e) => setStatus(e.target.value)}
-          >
+          {t("action")}
+          <select name="status">
             {transitions[review.status].map((s) => (
               <option key={s} value={s}>
-                {label(s)}
+                {t(s)}
               </option>
             ))}
           </select>
         </label>
         <label>
-          Reviewer note
-          <textarea
-            aria-label="Reviewer note"
-            required
-            minLength={5}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Explain the evidence considered and the next step…"
-          />
+          {t("reviewNote")}
+          <textarea name="note" required minLength={5} maxLength={2000} />
         </label>
-        <button className="primary" disabled={!enabled}>
-          Record review action
+        <button className="button" disabled={busy}>
+          {t("saveAction")}
         </button>
       </form>
     </section>
+  );
+}
+function Accounts({ onError }: { onError: (error: string) => void }) {
+  const { t } = usePreferences();
+  const [accounts, setAccounts] = useState<(User & { disabled: boolean })[]>(
+      [],
+    ),
+    [offset, setOffset] = useState(0),
+    [busy, setBusy] = useState(false),
+    [done, setDone] = useState(false);
+  useEffect(() => {
+    api<{ accounts: (User & { disabled: boolean })[] }>(
+      `/api/accounts?offset=${offset}`,
+    )
+      .then((d) => setAccounts(d.accounts))
+      .catch((e) => onError(e.message));
+  }, [offset, onError]);
+  async function refresh() {
+    setAccounts(
+      (
+        await api<{ accounts: (User & { disabled: boolean })[] }>(
+          `/api/accounts?offset=${offset}`,
+        )
+      ).accounts,
+    );
+  }
+  return (
+    <>
+      <form
+        className="panel account-form"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const form = e.currentTarget,
+            f = new FormData(form);
+          setBusy(true);
+          setDone(false);
+          try {
+            await api("/api/accounts", {
+              action: "create",
+              name: f.get("name"),
+              email: f.get("email"),
+              password: f.get("password"),
+              parcelIds: String(f.get("parcels"))
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            });
+            form.reset();
+            await refresh();
+            setDone(true);
+          } catch (e) {
+            onError((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <h2>{t("createAccount")}</h2>
+        {done && (
+          <div role="status" className="notice success">
+            {t("saved")}
+          </div>
+        )}
+        <div className="form-grid">
+          <label>
+            {t("name")}
+            <input name="name" required minLength={2} maxLength={100} />
+          </label>
+          <label>
+            {t("email")}
+            <input name="email" type="email" required maxLength={254} />
+          </label>
+          <label>
+            {t("newPassword")}
+            <input
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={12}
+              maxLength={128}
+            />
+          </label>
+        </div>
+        <label>
+          {t("grant")}
+          <input
+            name="parcels"
+            required
+            placeholder="DEMO-P4-001, DEMO-P4-002"
+          />
+        </label>
+        <p>{t("grantHelp")}</p>
+        <button className="button" disabled={busy}>
+          {t("createAccount")}
+        </button>
+      </form>
+      <section className="panel">
+        {accounts.map((a) => (
+          <div className="account-row" key={a.id}>
+            <Users size={21} />
+            <div>
+              <strong>{a.display_name}</strong>
+              <small>
+                {a.email} · {t(a.role === "ADMIN" ? "admin" : "reviewer")} ·{" "}
+                {t(a.disabled ? "disabled" : "active")}
+              </small>
+            </div>
+            {a.role !== "ADMIN" && !a.disabled && (
+              <button
+                className="button ghost small"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    await api("/api/accounts", { action: "disable", id: a.id });
+                    await refresh();
+                  } catch (e) {
+                    onError((e as Error).message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {t("disable")}
+              </button>
+            )}
+          </div>
+        ))}
+        <Pagination
+          offset={offset}
+          size={10}
+          next={accounts.length === 10}
+          onChange={setOffset}
+        />
+      </section>
+    </>
+  );
+}
+
+function PasswordForm({
+  onError,
+  onChanged,
+}: {
+  onError: (error: string) => void;
+  onChanged: () => void;
+}) {
+  const { t } = usePreferences();
+  const [busy, setBusy] = useState(false);
+  return (
+    <form
+      className="panel login-card"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        setBusy(true);
+        try {
+          await api(
+            "/api/session",
+            {
+              currentPassword: f.get("currentPassword"),
+              newPassword: f.get("newPassword"),
+            },
+            "PATCH",
+          );
+          onChanged();
+        } catch (e) {
+          onError((e as Error).message);
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <h2>{t("changePassword")}</h2>
+      <p>{t("passwordHelp")}</p>
+      <label>
+        {t("currentPassword")}
+        <input
+          name="currentPassword"
+          type="password"
+          autoComplete="current-password"
+          required
+          maxLength={128}
+        />
+      </label>
+      <label>
+        {t("newPasswordLabel")}
+        <input
+          name="newPassword"
+          type="password"
+          autoComplete="new-password"
+          required
+          minLength={12}
+          maxLength={128}
+        />
+      </label>
+      <button className="button" disabled={busy}>
+        {t("changePassword")}
+      </button>
+    </form>
   );
 }

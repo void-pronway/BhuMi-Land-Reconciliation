@@ -1,49 +1,75 @@
-import { NextResponse } from "next/server";
-import { passwordMatches, sameOrigin, token } from "@/lib/auth";
-const attempts = new Map<string, { count: number; until: number }>();
-export async function POST(request: Request) {
-  if (!sameOrigin(request))
-    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-  const key = "local-demo";
-  const prior = attempts.get(key);
-  if (prior && prior.until > Date.now() && prior.count >= 10)
-    return NextResponse.json(
-      { error: "Too many attempts. Retry in one minute." },
-      { status: 429 },
-    );
-  const body = await request.json().catch(() => null);
-  if (
-    !body ||
-    typeof body.password !== "string" ||
-    !passwordMatches(body.password)
-  ) {
-    attempts.set(key, {
-      count: prior && prior.until > Date.now() ? prior.count + 1 : 1,
-      until: Date.now() + 60000,
-    });
-    return NextResponse.json(
-      {
-        error:
-          "Reviewer access is not configured or the password is incorrect.",
-      },
-      { status: 401 },
-    );
+import { z } from "zod";
+import {
+  login,
+  logout,
+  currentUser,
+  requireUser,
+  changePassword,
+} from "@/lib/auth";
+import { assertOrigin, json, failure, readJson } from "@/lib/server/http";
+export const dynamic = "force-dynamic";
+const credentials = z
+  .object({
+    email: z
+      .email()
+      .max(254)
+      .transform((s) => s.toLowerCase()),
+    password: z.string().min(1).max(128),
+  })
+  .strict();
+export async function GET() {
+  try {
+    return json({ user: await currentUser() });
+  } catch (e) {
+    return failure(e);
   }
-  attempts.delete(key);
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set("bhumi_session", token(), {
-    httpOnly: true,
-    sameSite: "strict",
-    secure: new URL(request.url).protocol === "https:",
-    path: "/",
-    maxAge: 28800,
-  });
-  return response;
+}
+export async function POST(request: Request) {
+  try {
+    assertOrigin(request);
+    const body = credentials.parse(await readJson(request, 2048));
+    const token = await login(body.email, body.password);
+    const response = json({ ok: true });
+    response.cookies.set("bhumi_session", token, {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: (process.env.APP_ORIGIN ?? "").startsWith("https://"),
+      path: "/",
+      maxAge: 28800,
+    });
+    return response;
+  } catch (e) {
+    return failure(e);
+  }
 }
 export async function DELETE(request: Request) {
-  if (!sameOrigin(request))
-    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-  const response = NextResponse.json({ ok: true });
-  response.cookies.delete("bhumi_session");
-  return response;
+  try {
+    assertOrigin(request);
+    await logout();
+    const response = json({ ok: true });
+    response.cookies.delete("bhumi_session");
+    return response;
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    assertOrigin(request);
+    const user = await requireUser();
+    const body = z
+      .object({
+        currentPassword: z.string().min(1).max(128),
+        newPassword: z.string().min(12).max(128),
+      })
+      .strict()
+      .parse(await readJson(request, 2048));
+    await changePassword(user, body.currentPassword, body.newPassword);
+    const response = json({ ok: true });
+    response.cookies.delete("bhumi_session");
+    return response;
+  } catch (e) {
+    return failure(e);
+  }
 }

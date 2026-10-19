@@ -6,20 +6,40 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: bhumi_test
+          POSTGRES_PASSWORD: test-only-local-ci
+          POSTGRES_DB: bhumi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bhumi_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm ci --include=dev
       - run: npm test
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
-      - run: npm run test:restart
+      - name: Embedded PostgreSQL browser journeys
+        run: npm run test:e2e
+      - name: Embedded database restart persistence
+        run: npm run test:restart
+      - name: Hosted adapter browser journeys against PostgreSQL
+        run: npm run test:e2e
+        env:
+          TEST_DATABASE_URL: postgres://bhumi_test:test-only-local-ci@127.0.0.1:5432/bhumi_test
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

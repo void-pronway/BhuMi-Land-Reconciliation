@@ -1,5 +1,7 @@
 # BhuMi pitch deck
 
+**Version note:** These presentation files predate the bilingual redesign and individual accounts. Review screenshots, authentication, database details and test counts against the current README and validation report before presenting; the deck has not been regenerated for this release.
+
 - [Nine-slide PDF](BhuMi_Pitch_Deck.pdf): submission/presentation copy.
 - [Editable PowerPoint](BhuMi_Pitch_Deck.pptx): edit in PowerPoint, LibreOffice Impress or import into Google Slides.
 - [Speaker notes](Speaker_Notes.md): five-minute narrative, also embedded in the PowerPoint notes.
