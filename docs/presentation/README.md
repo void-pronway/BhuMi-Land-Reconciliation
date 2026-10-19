@@ -8,7 +8,7 @@
 
 The live example is **DEMO-P4-011**, the concept note's 100-decimal parcel with a hidden 10-decimal discrepancy. The main application feature card instead opens DEMO-P4-001, the separate 120-decimal / 15-decimal example. Select DEMO-P4-011 manually when presenting slide 5.
 
-Before submission, replace student names, DIU IDs and mentor placeholders on slide 9. The wordmark is a temporary original treatment, not an official supplied logo. Review the content and rehearse with the actual application. The PDF contains nine slides; speaker notes are not included as extra pages. This deck has not been submitted to the organizers.
+Before submission, replace student names, DIU IDs and mentor placeholders on slide 9. The cover uses the logo supplied by the project owner. Review the content and rehearse with the actual application. The PDF contains nine slides; speaker notes are not included as extra pages. This deck has not been submitted to the organizers.
 
 Implemented functionality and measured tests are separated from future plans. The deck does not claim government integration, legal verification, institutional adoption or verified hosted deployment.
 

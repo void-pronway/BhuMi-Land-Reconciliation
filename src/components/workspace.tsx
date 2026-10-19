@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { DEMO_ACCOUNT } from "@/lib/demo-account";
 import {
   ArrowRight,
@@ -70,7 +71,7 @@ export function Brand() {
   return (
     <span className="brand">
       <span className="brand-symbol">
-        <Layers3 size={27} />
+        <Image src="/brand/bhumi-symbol.png" alt="" width={46} height={46} />
       </span>
       <span>
         <b>{lang === "bn" ? "ভূমি" : "BhuMi"}</b>

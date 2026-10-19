@@ -3,6 +3,17 @@ import { cookies } from "next/headers";
 import { PreferencesProvider } from "@/components/preferences";
 import "./globals.css";
 export const metadata: Metadata = {
+  icons: {
+    icon: [
+      {
+        url: "/favicon.ico?v=2",
+        sizes: "16x16 32x32 48x48",
+        type: "image/x-icon",
+      },
+      { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [{ url: "/brand/apple-touch-icon.png", sizes: "180x180" }],
+  },
   title: "BhuMi · ভূমি — Ownership Reconciliation",
   description:
     "Understand every ownership share. A bilingual, evidence-led land record reconciliation prototype.",

@@ -34,10 +34,7 @@ def text(s,x,y,w,h,value,size=22,color=INK,bold=False,font='Arial',align=None):
  return sh
 
 def logo(s,x,y,dark=True,scale=1):
- color=MINT if dark else TEAL
- for dy in [0,.12,.24]:
-  sh=s.shapes.add_shape(MSO_SHAPE.CHEVRON,Inches(x),Inches(y+dy),Inches(.35*scale),Inches(.18*scale));sh.rotation=90
-  sh.fill.solid();sh.fill.fore_color.rgb=RGBColor.from_string(color);sh.line.fill.background()
+ s.shapes.add_picture(str(OUT.parent.parent/'public/brand/bhumi-symbol.png'),Inches(x),Inches(y),width=Inches(.45*scale),height=Inches(.45*scale))
  text(s,x+.52,y-.04,2,.5,'BhuMi',25,WHITE if dark else NAVY,True)
 
 def base(n,kicker,title=None,dark=False):
@@ -67,7 +64,7 @@ text(s,.77,4.48,8.2,1,'Every land transaction should leave a traceable,\nconsist
 text(s,.77,6.2,9,.35,'Team BhuMi  ·  Daffodil International University, Bangladesh',16,MINT)
 for i,(label,val) in enumerate([('DOCUMENTED INTEREST','1/2'),('TRANSFERRED INTEREST','1/4'),('REMAINING INTEREST','1/4')]):
  y=1.5+i*1.5;box(s,10.1,y,2.45,1.25,'204957',None,True);text(s,10.3,y+.18,2.05,.3,label,9,MINT,True);text(s,10.3,y+.52,2.05,.6,val,32,WHITE,True)
-note(s,'20 seconds. Introduce BhuMi and the P4 category. We compare the ownership that a documented transaction supports with the mutation that follows. This is a synthetic prototype supporting human review, not an official government service. The wordmark is a temporary original treatment; replace it with the official team logo if supplied.')
+note(s,'20 seconds. Introduce BhuMi and the P4 category. We compare the ownership that a documented transaction supports with the mutation that follows. This is a synthetic prototype supporting human review, not an official government service. The logo is supplied by the project owner.')
 # 2
 s=base(2,'01 / The problem','Digital records can still disagree.')
 text(s,.67,1.83,11.6,.6,'A deed and its mutation can add up — while assigning land interests to the wrong people.',22,MUTED)

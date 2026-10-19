@@ -2,7 +2,7 @@
 
 ## Slide 1
 
-20 seconds. Introduce BhuMi and the P4 category. We compare the ownership that a documented transaction supports with the mutation that follows. This is a synthetic prototype supporting human review, not an official government service. The wordmark is a temporary original treatment; replace it with the official team logo if supplied.
+20 seconds. Introduce BhuMi and the P4 category. We compare the ownership that a documented transaction supports with the mutation that follows. This is a synthetic prototype supporting human review, not an official government service. The logo is supplied by the project owner.
 
 ## Slide 2
 

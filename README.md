@@ -1,4 +1,4 @@
-![BhuMi — Records. Reconciled.](public/wordmark.svg)
+<img src="public/brand/bhumi-logo.png" alt="BhuMi — Land Ownership Reconciliation" width="280" />
 
 ## Judge demo login
 
